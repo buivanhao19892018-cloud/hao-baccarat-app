@@ -1,1 +1,39 @@
-https://raw.githubusercontent.com/placeholder-buihao/c7-elite/index.html
+<section class="card">
+  <div class="controls">
+    <button class="btn b" onclick="addResult('B')">Banker</button>
+    <button class="btn p" onclick="addResult('P')">Player</button>
+    <button class="btn t" onclick="addResult('T')">Tie</button>
+    <button class="btn ghost" onclick="undo()">Undo</button>
+    <button class="btn danger" onclick="resetAll()">Reset</button>
+  </div>
+
+  <div class="row chips">
+    <div class="chip"><span class="dot b"></span> B <b id="bCount">0</b></div>
+    <div class="chip"><span class="dot p"></span> P <b id="pCount">0</b></div>
+    <div class="chip"><span class="dot t"></span> T <b id="tCount">0</b></div>
+    <div class="chip">Tổng <b id="total">0</b></div>
+  </div>
+
+  <div class="scoreBox">
+    <div class="scoreBox__left">
+      <div class="scoreBox__title">AI đứng giữa — % theo 20 ván gần nhất</div>
+      <div class="scoreBox__score" id="conf">--</div>
+      <div class="pill" id="confLabel">CONFIDENCE</div>
+    </div>
+    <div class="scoreBox__right">
+      <div class="scoreBox__title">Percent (Last 20)</div>
+
+      <div class="row chips">
+        <div class="chip">B% (B/P): <b id="bpB20">-</b></div>
+        <div class="chip">P% (B/P): <b id="bpP20">-</b></div>
+        <div class="chip">T% (All): <b id="t20">-</b></div>
+        <div class="chip">EDGE: <b id="edge20">-</b></div>
+        <div class="chip">NOISE: <b id="noise20">-</b></div>
+      </div>
+
+      <div class="miniHint" id="explain20">
+        Chưa đủ dữ liệu. Nhập thêm để AI tính % theo 20 ván gần nhất.
+      </div>
+    </div>
+  </div>
+</section>
