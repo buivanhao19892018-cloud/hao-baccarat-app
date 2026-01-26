@@ -1,0 +1,9 @@
+{
+  "name": "Hào Baccarat — C4 PRO",
+  "short_name": "Hào Baccarat",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#061425",
+  "theme_color": "#061425",
+  "icons": []
+}
