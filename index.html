@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Hào Baccarat App</title>
+<style>
+body{font-family:sans-serif;background:#111;color:#fff;padding:16px}
+button{padding:10px 16px;margin:4px;border:none;border-radius:8px;background:#00c853;color:#fff;font-size:16px}
+.card{background:#1c1c1c;padding:16px;border-radius:12px;margin-bottom:12px}
+h1{color:#00e5ff}
+</style>
+</head>
+<body>
+
+<h1>Hào Baccarat</h1>
+
+<div class="card">
+<h2>Nhập kết quả ván</h2>
+<button onclick="add('B')">Banker</button>
+<button onclick="add('P')">Player</button>
+<button onclick="add('T')">Tie</button>
+<button onclick="reset()">Reset</button>
+</div>
+
+<div class="card">
+<h2>Lịch sử</h2>
+<div id="log"></div>
+</div>
+
+<script>
+let data = JSON.parse(localStorage.getItem("bac")) || [];
+
+function render(){
+ document.getElementById("log").innerHTML = data.join(" ");
+ localStorage.setItem("bac", JSON.stringify(data));
+}
+
+function add(x){
+ data.push(x);
+ render();
+}
+
+function reset(){
+ if(confirm("Xóa lịch sử?")){
+ data = [];
+ render();
+ }
+}
+
+render();
+</script>
+
+</body>
+</html>
