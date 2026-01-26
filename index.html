@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#061425" />
+  <title>Hào Baccarat — C4 PRO</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top card">
+      <div class="brand">
+        <div class="title">Hào Baccarat — C4 PRO</div>
+        <div class="sub">
+          Ghi lịch sử ván + xem Road (Bead/Big/BigEye/Small/Cockroach). Lưu máy (localStorage) + Export/Import + Offline.
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn b" id="btnB">Banker</button>
+        <button class="btn p" id="btnP">Player</button>
+        <button class="btn t" id="btnT">Tie</button>
+        <button class="btn u" id="btnUndo">Undo</button>
+        <button class="btn r" id="btnReset">Reset</button>
+      </div>
+
+      <div class="chips">
+        <div class="chip"><span class="dot b"></span><span>B</span><b id="bCount">0</b></div>
+        <div class="chip"><span class="dot p"></span><span>P</span><b id="pCount">0</b></div>
+        <div class="chip"><span class="dot t"></span><span>T</span><b id="tCount">0</b></div>
+        <div class="chip"><span>总</span><b id="total">0</b></div>
+        <div class="chip"><span>Streak</span><b id="streak">-</b></div>
+        <div class="chip"><span>Longest</span><b id="longest">-</b></div>
+      </div>
+
+      <div class="mini">
+        <div class="miniCard">
+          <div class="miniLabel">Last 20 (B/P)</div>
+          <div class="miniVal" id="last20bp">-</div>
+        </div>
+        <div class="miniCard">
+          <div class="miniLabel">Tie rate (Last 20)</div>
+          <div class="miniVal" id="tie20">-</div>
+        </div>
+        <div class="miniCard">
+          <div class="miniLabel">Alt rate (Last 20, B/P)</div>
+          <div class="miniVal" id="alt20">-</div>
+        </div>
+      </div>
+
+      <div class="toolRow">
+        <button class="btn s" id="btnExport">Export</button>
+        <button class="btn s" id="btnImport">Import</button>
+        <button class="btn s" id="btnInstall">Cài (PWA)</button>
+        <span class="hint">Mẹo: phím B/P/T (nếu dùng PC), Undo=Z</span>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="card">
+        <div class="secHead">
+          <div>
+            <div class="secTitle">Lịch sử</div>
+            <div class="secSub">Chạm 1 mục để xoá đúng ván đó.</div>
+          </div>
+          <div class="secRight">
+            <select id="historyLimit">
+              <option value="50">Hiện 50</option>
+              <option value="100">Hiện 100</option>
+              <option value="200" selected>Hiện 200</option>
+              <option value="9999">Hiện ALL</option>
+            </select>
+          </div>
+        </div>
+        <div id="history" class="historyBox">Chưa có lịch sử.</div>
+        <div class="footNote">
+          App chỉ ghi/hiển thị Road & thống kê — không phải công cụ dự đoán chắc thắng.
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="secHead">
+          <div>
+            <div class="secTitle">Roads</div>
+            <div class="secSub">Big Road có Tie đánh dấu góc (xN).</div>
+          </div>
+          <div class="secRight">
+            <label class="toggle">
+              <input type="checkbox" id="toggleGrid" checked>
+              <span>Viền ô</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="toggleCompact" checked>
+              <span>Gọn</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="roads">
+          <div class="road">
+            <div class="roadHead">
+              <b>Bead Plate</b><span>72 ván</span>
+            </div>
+            <div class="board"><div id="bead" class="matrix"></div></div>
+          </div>
+
+          <div class="road">
+            <div class="roadHead">
+              <b>Big Road</b><span>6 hàng + Tie góc</span>
+            </div>
+            <div class="board"><div id="big" class="matrix big"></div></div>
+          </div>
+
+          <div class="road">
+            <div class="roadHead">
+              <b>Big Eye Road</b><span>Red/Blue</span>
+            </div>
+            <div class="board"><div id="eye" class="matrix"></div></div>
+          </div>
+
+          <div class="road">
+            <div class="roadHead">
+              <b>Small Road</b><span>Red/Blue</span>
+            </div>
+            <div class="board"><div id="small" class="matrix"></div></div>
+          </div>
+
+          <div class="road span2">
+            <div class="roadHead">
+              <b>Cockroach Road</b><span>Red/Blue</span>
+            </div>
+            <div class="board"><div id="cock" class="matrix"></div></div>
+            <div class="legend">
+              <span><i class="lg b"></i> Banker</span>
+              <span><i class="lg p"></i> Player</span>
+              <span><i class="lg t"></i> Tie</span>
+              <span><i class="lg red"></i> Red</span>
+              <span><i class="lg blue"></i> Blue</span>
+              <span><i class="lg tie"></i> Tie mark</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- Modal -->
+    <div class="modal hidden" id="modal">
+      <div class="modalCard">
+        <div class="modalHead">
+          <b id="modalTitle">Export</b>
+          <button class="x" id="modalClose">✕</button>
+        </div>
+        <div class="modalBody">
+          <textarea id="modalText" spellcheck="false" placeholder=""></textarea>
+          <div class="modalBtns">
+            <button class="btn s" id="btnCopy">Copy</button>
+            <button class="btn s" id="btnPaste">Dán từ clipboard</button>
+            <button class="btn p" id="btnApply">Apply</button>
+          </div>
+          <div class="modalHint" id="modalHint"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
