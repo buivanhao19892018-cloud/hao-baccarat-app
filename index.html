@@ -1,39 +1,728 @@
-<section class="card">
-  <div class="controls">
-    <button class="btn b" onclick="addResult('B')">Banker</button>
-    <button class="btn p" onclick="addResult('P')">Player</button>
-    <button class="btn t" onclick="addResult('T')">Tie</button>
-    <button class="btn ghost" onclick="undo()">Undo</button>
-    <button class="btn danger" onclick="resetAll()">Reset</button>
-  </div>
-
-  <div class="row chips">
-    <div class="chip"><span class="dot b"></span> B <b id="bCount">0</b></div>
-    <div class="chip"><span class="dot p"></span> P <b id="pCount">0</b></div>
-    <div class="chip"><span class="dot t"></span> T <b id="tCount">0</b></div>
-    <div class="chip">Tổng <b id="total">0</b></div>
-  </div>
-
-  <div class="scoreBox">
-    <div class="scoreBox__left">
-      <div class="scoreBox__title">AI đứng giữa — % theo 20 ván gần nhất</div>
-      <div class="scoreBox__score" id="conf">--</div>
-      <div class="pill" id="confLabel">CONFIDENCE</div>
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#070a10" />
+  <title>Bùi Hào — Baccarat GOD (A)</title>
+  <style>
+    :root{
+      --bg:#070a10;
+      --panel:rgba(255,255,255,.06);
+      --stroke:rgba(255,255,255,.10);
+      --text:#eaf2ff;
+      --muted:rgba(234,242,255,.68);
+      --b:#20c997;
+      --p:#4dabf7;
+      --t:#ffd43b;
+      --bad:#ff5b6e;
+      --ok:#9cff6b;
+      --shadow:0 16px 42px rgba(0,0,0,.55);
+      --r:18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(1100px 700px at 20% 0%, #132a4b 0%, var(--bg) 58%) fixed;
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:14px 14px 26px;display:flex;flex-direction:column;gap:12px}
+    .hero{
+      border:1px solid var(--stroke);
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.05));
+      border-radius:22px;
+      box-shadow:var(--shadow);
+      padding:14px 14px 12px;
+    }
+    .title{font-weight:1000;font-size:22px;letter-spacing:.2px}
+    .subtitle{margin-top:6px;color:var(--muted);font-size:13px;line-height:1.35}
+    .tag{display:inline-block;margin-left:8px;padding:4px 10px;border-radius:999px;border:1px solid var(--stroke);background:rgba(0,0,0,.22);font-size:12px;font-weight:900;color:rgba(234,242,255,.85)}
+    .card{
+      border:1px solid var(--stroke);
+      background:var(--panel);
+      border-radius:var(--r);
+      box-shadow:var(--shadow);
+      padding:12px;
+    }
+    .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .btn{
+      appearance:none;border:0;cursor:pointer;
+      font-weight:1000;font-size:20px;
+      padding:18px 20px; border-radius:18px;
+      min-width:148px;
+      color:#051018;
+      user-select:none;
+    }
+    .btn:active{transform:translateY(1px);opacity:.92}
+    .b{background:var(--b)}
+    .p{background:var(--p)}
+    .t{background:var(--t)}
+    .ghost{
+      background:rgba(255,255,255,.10);
+      border:1px solid var(--stroke);
+      color:var(--text);
+      min-width:140px;
+    }
+    .danger{background:var(--bad);color:#fff}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .chips{margin-top:10px}
+    .chip{
+      background:rgba(0,0,0,.22);
+      border:1px solid var(--stroke);
+      padding:10px 12px;
+      border-radius:16px;
+      font-size:15px;
+    }
+    .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:8px;transform:translateY(1px)}
+    .dot.b{background:var(--b)}
+    .dot.p{background:var(--p)}
+    .dot.t{background:var(--t)}
+    .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+    @media(max-width:820px){.grid2{grid-template-columns:1fr}}
+    .panel{
+      border:1px dashed rgba(255,255,255,.18);
+      background:rgba(0,0,0,.20);
+      border-radius:16px;padding:12px;
+    }
+    .k{color:var(--muted);font-size:12px;font-weight:900}
+    .v{margin-top:6px;font-size:16px;font-weight:1000}
+    .big{
+      display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(0,0,0,.22);
+      border-radius:18px;
+      padding:12px;
+    }
+    .score{
+      font-size:56px;font-weight:1100;line-height:1;margin-top:6px;
+    }
+    .pill{
+      display:inline-block;margin-top:8px;padding:8px 14px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.06);
+      font-weight:1000;font-size:12px;color:rgba(234,242,255,.86)
+    }
+    .mini{color:var(--muted);font-size:12px;line-height:1.35}
+    .tabs{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .tab{
+      padding:10px 14px;border-radius:14px;border:1px solid var(--stroke);
+      background:rgba(0,0,0,.18);color:var(--text);
+      font-weight:1000;cursor:pointer;
+    }
+    .tab.active{background:rgba(255,255,255,.10)}
+    .boxmono{
+      margin-top:10px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(0,0,0,.25);
+      border-radius:18px;
+      padding:12px;
+      font-family:var(--mono);
+      font-size:12px;
+      white-space:pre-wrap;
+      color:rgba(234,242,255,.90);
+    }
+    .textarea{
+      width:100%;
+      margin-top:10px;
+      min-height:140px;
+      border-radius:18px;border:1px solid rgba(255,255,255,.12);
+      background:rgba(0,0,0,.22);
+      color:var(--text);
+      padding:12px;font-size:14px;outline:none;
+    }
+    .roadGrid{display:grid;grid-template-columns:1.2fr 1fr;gap:12px;margin-top:10px}
+    @media(max-width:900px){.roadGrid{grid-template-columns:1fr}}
+    .roadCard{
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(0,0,0,.18);
+      border-radius:18px;
+      padding:12px;
+    }
+    .roadTitle{font-weight:1100;color:var(--muted);font-size:12px;margin-bottom:8px}
+    .bead{display:grid;grid-template-columns:repeat(12,1fr);gap:6px}
+    .grid30{display:grid;grid-template-columns:repeat(30,1fr);gap:4px}
+    .cell{
+      width:100%;
+      aspect-ratio:1/1;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.05);
+      display:flex;align-items:center;justify-content:center;
+      font-weight:1100;font-size:12px;
+      color:rgba(234,242,255,.92);
+    }
+    .cell.b{background:rgba(32,201,151,.22);border-color:rgba(32,201,151,.35);color:#062118}
+    .cell.p{background:rgba(77,171,247,.22);border-color:rgba(77,171,247,.35);color:#061b33}
+    .cell.t{background:rgba(255,212,59,.22);border-color:rgba(255,212,59,.35);color:#3b2f00}
+    .history{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .hitem{
+      padding:10px 12px;border-radius:14px;border:1px solid var(--stroke);
+      background:rgba(0,0,0,.18);
+      font-weight:1100;min-width:54px;text-align:center;cursor:pointer;
+    }
+    .hitem.b{background:rgba(32,201,151,.22);border-color:rgba(32,201,151,.35);color:#0a2a1f}
+    .hitem.p{background:rgba(77,171,247,.22);border-color:rgba(77,171,247,.35);color:#0a1f39}
+    .hitem.t{background:rgba(255,212,59,.22);border-color:rgba(255,212,59,.35);color:#3b2f00}
+    .select{
+      padding:10px 12px;border-radius:14px;border:1px solid var(--stroke);
+      background:rgba(0,0,0,.22);color:var(--text);font-weight:1000;
+    }
+    .fileBtn input{display:none}
+    .footer{color:rgba(234,242,255,.55);font-size:12px;text-align:center;padding:6px 0 4px}
+    .bar{
+      height:12px;border-radius:999px;border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);overflow:hidden;min-width:240px;
+    }
+    .bar > div{height:100%}
+    .barB{background:var(--b)}
+    .barP{background:var(--p)}
+    .warn{color:var(--bad);font-weight:1000}
+    .ok{color:var(--ok);font-weight:1000}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="title">Bùi Hào — Baccarat GOD (A) <span class="tag">VIP BLACK • AI đứng giữa</span></div>
+      <div class="subtitle">
+        Tool ghi ván + % theo <b>Last 20</b> + nhịp/entropy/alt/transition/noise/confidence + road cơ bản.
+        Không phán kèo. Chỉ đưa số liệu để tự quyết.
+      </div>
     </div>
-    <div class="scoreBox__right">
-      <div class="scoreBox__title">Percent (Last 20)</div>
+
+    <div class="card">
+      <div class="controls">
+        <button class="btn b" id="btnB">Banker</button>
+        <button class="btn p" id="btnP">Player</button>
+        <button class="btn t" id="btnT">Tie</button>
+        <button class="btn ghost" id="btnU">Undo</button>
+        <button class="btn danger" id="btnR">Reset</button>
+        <button class="btn ghost" id="btnShoe">New shoe</button>
+      </div>
 
       <div class="row chips">
-        <div class="chip">B% (B/P): <b id="bpB20">-</b></div>
-        <div class="chip">P% (B/P): <b id="bpP20">-</b></div>
-        <div class="chip">T% (All): <b id="t20">-</b></div>
-        <div class="chip">EDGE: <b id="edge20">-</b></div>
-        <div class="chip">NOISE: <b id="noise20">-</b></div>
+        <div class="chip"><span class="dot b"></span> B <b id="cB">0</b></div>
+        <div class="chip"><span class="dot p"></span> P <b id="cP">0</b></div>
+        <div class="chip"><span class="dot t"></span> T <b id="cT">0</b></div>
+        <div class="chip">Total <b id="cN">0</b></div>
+        <div class="chip">Shoe <b id="shoeId">1</b></div>
+        <div class="chip">Streak(B/P) <b id="streak">-</b></div>
       </div>
 
-      <div class="miniHint" id="explain20">
-        Chưa đủ dữ liệu. Nhập thêm để AI tính % theo 20 ván gần nhất.
+      <div class="grid2">
+        <div class="panel">
+          <div class="k">Last20 B% (B/P)</div>
+          <div class="v" id="bpB20">-</div>
+          <div class="mini">Bỏ tie để đọc lực B/P.</div>
+        </div>
+        <div class="panel">
+          <div class="k">Last20 P% (B/P)</div>
+          <div class="v" id="bpP20">-</div>
+          <div class="mini">Song song với B%.</div>
+        </div>
+        <div class="panel">
+          <div class="k">Last20 Tie% (All)</div>
+          <div class="v" id="t20">-</div>
+          <div class="mini">Tie nhiều = nhiễu.</div>
+        </div>
+        <div class="panel">
+          <div class="k">EDGE (Last20)</div>
+          <div class="v" id="edge20">-</div>
+          <div class="mini">Chênh % giữa B và P.</div>
+        </div>
+      </div>
+
+      <div class="big">
+        <div style="min-width:240px">
+          <div class="k">CONFIDENCE 0–100</div>
+          <div class="score" id="conf">--</div>
+          <div class="pill" id="confLabel">—</div>
+          <div class="mini" id="note">Chưa đủ dữ liệu — ưu tiên quan sát.</div>
+        </div>
+
+        <div style="flex:1;min-width:260px">
+          <div class="k">NOISE / ENTROPY / ALT (Last20)</div>
+          <div class="row" style="margin-top:8px">
+            <div class="chip">Noise: <b id="noise">-</b></div>
+            <div class="chip">Entropy(B/P): <b id="ent">-</b></div>
+            <div class="chip">Alt(B/P): <b id="alt">-</b></div>
+            <div class="chip">B→B: <b id="bb">-</b></div>
+            <div class="chip">P→P: <b id="pp">-</b></div>
+          </div>
+
+          <div class="k" style="margin-top:10px">Lực trực quan (Last20 B/P)</div>
+          <div class="row" style="margin-top:6px;align-items:center">
+            <div class="bar" aria-label="bar">
+              <div id="barB" class="barB" style="width:50%"></div>
+              <div id="barP" class="barP" style="width:50%"></div>
+            </div>
+            <div class="chip" id="barText">B 50% • P 50%</div>
+          </div>
+
+          <div class="mini" style="margin-top:10px">
+            <span class="warn">Không có “theo cửa”.</span> Chỉ có % + độ nhiễu + chuyển trạng thái.
+            Nếu mạng yếu: bản 1-file này sẽ ổn hơn.
+          </div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="road">Road</button>
+        <button class="tab" data-tab="deep">Deep</button>
+        <button class="tab" data-tab="data">Data</button>
+        <button class="tab" data-tab="journal">Journal</button>
+      </div>
+
+      <div id="tab-road">
+        <div class="roadGrid">
+          <div class="roadCard">
+            <div class="roadTitle">Bead Plate (72 ván gần nhất)</div>
+            <div id="bead" class="bead"></div>
+          </div>
+          <div class="roadCard">
+            <div class="roadTitle">Big Road (mô phỏng nhanh 6x30, bỏ tie cell)</div>
+            <div id="bigroad" class="grid30"></div>
+            <div class="mini" style="margin-top:8px">
+              Tie được tính trong %/noise. Road mô phỏng để xem nhịp trực quan.
+            </div>
+          </div>
+        </div>
+
+        <div class="roadCard" style="margin-top:12px">
+          <div class="roadTitle">History (chạm để xoá đúng ván)</div>
+          <div class="row" style="justify-content:space-between">
+            <div class="mini">Tip: dữ liệu ≥ 12 ván mới đọc ổn.</div>
+            <select id="limit" class="select">
+              <option value="50">Hiện 50</option>
+              <option value="100">Hiện 100</option>
+              <option value="200" selected>Hiện 200</option>
+              <option value="500">Hiện 500</option>
+            </select>
+          </div>
+          <div id="history" class="history"></div>
+        </div>
+      </div>
+
+      <div id="tab-deep" style="display:none">
+        <div class="boxmono" id="deepBox">—</div>
+      </div>
+
+      <div id="tab-data" style="display:none">
+        <div class="controls">
+          <button class="btn ghost" id="btnExport">Export JSON</button>
+          <label class="btn ghost fileBtn">Import JSON <input id="file" type="file" accept="application/json" /></label>
+          <button class="btn ghost" id="btnClear">Clear lưu máy</button>
+        </div>
+        <div class="boxmono" id="dataBox">—</div>
+      </div>
+
+      <div id="tab-journal" style="display:none">
+        <div class="mini">Ghi chú theo shoe: bàn/dealer/giờ/tâm lý/điểm vào.</div>
+        <textarea id="journal" class="textarea" placeholder="Ghi chú..."></textarea>
+        <div class="controls">
+          <button class="btn ghost" id="btnSaveJ">Lưu ghi chú</button>
+          <button class="btn ghost" id="btnClearJ">Xoá ghi chú</button>
+        </div>
       </div>
     </div>
+
+    <div class="footer">© Bùi Hào — Baccarat GOD (A) • Offline-friendly • No bet-calls</div>
   </div>
-</section>
+
+<script>
+(() => {
+  const KEY = "hao_baccarat_godA_onefile_v1";
+  const KEYJ = "hao_baccarat_godA_journal_v1";
+
+  let state = load() || { shoeId: 1, history: [] }; // history: {x:'B'|'P'|'T', t:number, shoe:number}
+  let journal = localStorage.getItem(KEYJ) || "";
+
+  const $ = (id) => document.getElementById(id);
+
+  function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+  function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||""); } catch(e){ return null; } }
+
+  function lastN(arr,n){ return arr.slice(Math.max(0, arr.length-n)); }
+  function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
+  function pct(n,d){ return d ? (n*100/d).toFixed(0)+"%" : "-"; }
+
+  function count(arr){
+    let B=0,P=0,T=0;
+    for(const it of arr){ if(it.x==='B')B++; else if(it.x==='P')P++; else if(it.x==='T')T++; }
+    return {B,P,T,total:arr.length,bpTotal:B+P};
+  }
+  function bpSeq(arr){ return arr.filter(it=>it.x==='B'||it.x==='P').map(it=>it.x); }
+
+  function streak(bp){
+    if(!bp.length) return "-";
+    let s=1;
+    for(let i=bp.length-1;i>0;i--){ if(bp[i]===bp[i-1]) s++; else break; }
+    return bp[bp.length-1] + s;
+  }
+
+  function altRate(bp){
+    if(bp.length<2) return 0;
+    let alt=0;
+    for(let i=1;i<bp.length;i++) if(bp[i]!==bp[i-1]) alt++;
+    return alt/(bp.length-1); // 0..1
+  }
+
+  function entropyBP(bp){
+    if(!bp.length) return 0;
+    const n=bp.length;
+    const b=bp.filter(x=>x==='B').length/n;
+    const p=1-b;
+    const H=q=> q<=0?0:(-q*Math.log2(q));
+    return H(b)+H(p); // 0..1
+  }
+
+  // Markov transition on BP only (Last20 BP)
+  function transitions(bp){
+    let bb=0,bp1=0,pb=0,pp=0;
+    for(let i=1;i<bp.length;i++){
+      const a=bp[i-1], c=bp[i];
+      if(a==='B'&&c==='B') bb++;
+      if(a==='B'&&c==='P') bp1++;
+      if(a==='P'&&c==='B') pb++;
+      if(a==='P'&&c==='P') pp++;
+    }
+    const bTot = bb+bp1;
+    const pTot = pb+pp;
+    const pBB = bTot? bb/bTot : 0;
+    const pPP = pTot? pp/pTot : 0;
+    return {bb,bp1,pb,pp,pBB,pPP};
+  }
+
+  function buildBigRoad(bp){
+    const ROWS=6, COLS=30;
+    const grid = Array.from({length:ROWS}, ()=>Array(COLS).fill(null));
+    let col=0,row=0,last=null;
+    const place=(r,c,v)=>{ if(c<COLS) grid[r][c]=v; };
+    for(const x of bp){
+      if(!last){ col=0;row=0; place(row,col,x); last=x; continue; }
+      if(x===last){
+        if(row+1<ROWS && !grid[row+1][col]) row++;
+        else col++;
+      }else{
+        col++; row=0; last=x;
+      }
+      place(row,col,x);
+    }
+    return grid;
+  }
+
+  function renderBead(arr){
+    const el=$("bead"); el.innerHTML="";
+    const items = lastN(arr,72);
+    for(const it of items){
+      const d=document.createElement("div");
+      d.className="cell "+(it.x==='B'?'b':it.x==='P'?'p':'t');
+      d.textContent=it.x;
+      el.appendChild(d);
+    }
+    for(let i=items.length;i<72;i++){
+      const d=document.createElement("div"); d.className="cell"; d.textContent="";
+      el.appendChild(d);
+    }
+  }
+
+  function renderGrid(elId, grid){
+    const el=$(elId); el.innerHTML="";
+    const R=grid.length, C=grid[0].length;
+    for(let r=0;r<R;r++){
+      for(let c=0;c<C;c++){
+        const v=grid[r][c];
+        const d=document.createElement("div");
+        d.className="cell "+(v==='B'?'b':v==='P'?'p':'');
+        d.textContent=v?v:"";
+        el.appendChild(d);
+      }
+    }
+  }
+
+  function exportJSON(){
+    const blob = new Blob([JSON.stringify({state, journal}, null, 2)], {type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="bui-hao-baccarat-godA-export.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function importJSON(file){
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const obj=JSON.parse(reader.result);
+        if(!obj || !obj.state || !Array.isArray(obj.state.history)) throw new Error("Sai định dạng");
+        state=obj.state;
+        journal=obj.journal||"";
+        localStorage.setItem(KEYJ, journal);
+        save();
+        render();
+        alert("Import OK");
+      }catch(e){ alert("Import lỗi: "+e.message); }
+    };
+    reader.readAsText(file);
+  }
+
+  // Core compute (Last20)
+  function compute(){
+    const h = state.history;
+    const h20 = lastN(h,20);
+    const c20 = count(h20);
+    const bp20 = bpSeq(h20);
+
+    const bPct = c20.bpTotal ? (c20.B*100/c20.bpTotal) : 0;
+    const pPct = c20.bpTotal ? (c20.P*100/c20.bpTotal) : 0;
+    const tPct = c20.total ? (c20.T*100/c20.total) : 0;
+    const edge = Math.abs(bPct-pPct); // 0..100
+
+    const alt = altRate(bp20);     // 0..1
+    const ent = entropyBP(bp20);   // 0..1
+    const tie = c20.total ? (c20.T/c20.total) : 0; // 0..1
+    const tr = transitions(bp20);
+
+    // Noise 0..100 (đảo + cân + tie)
+    let noise = 0;
+    noise += 45*alt;
+    noise += 35*ent;
+    noise += 20*Math.min(1, tie/0.25);
+    noise = clamp(Math.round(noise),0,100);
+
+    // Confidence 0..100 (edge tốt + noise thấp), phạt streak quá dài cuối chuỗi
+    const st = streak(bp20);
+    const stN = (typeof st==="string" && st.length>1) ? parseInt(st.slice(1),10) : 0;
+
+    let conf = 50;
+    conf += clamp(edge,0,30)*1.25;
+    conf -= noise*0.85;
+    if(stN>=6) conf -= 10;
+    if(h.length<12) conf -= 8;
+    conf = clamp(Math.round(conf),0,100);
+
+    // Label (không phán kèo)
+    let label="TRUNG TÍNH";
+    let note="Đọc % + noise để tự quyết.";
+    if(h.length<6){ label="DỮ LIỆU ÍT"; note="Chưa đủ ván. Ưu tiên quan sát thêm."; }
+    else if(conf>=70 && noise<=35){ label="TÍN HIỆU RÕ"; note="Edge có + noise thấp. Vẫn giữ kỷ luật."; }
+    else if(conf>=58 && noise<=45){ label="KHÁ"; note="Có hướng nhẹ. Chờ xác nhận thêm."; }
+    else { label="NHIỄU"; note="Noise cao hoặc edge thấp. Dễ bẫy nhịp."; }
+
+    const winner = (bPct>=pPct) ? "B" : "P";
+
+    return {h20,c20,bPct,pPct,tPct,edge,alt,ent,noise,conf,label,note,st,stN,winner,tr};
+  }
+
+  function render(){
+    const h=state.history;
+    const c=count(h);
+    $("cB").textContent=c.B;
+    $("cP").textContent=c.P;
+    $("cT").textContent=c.T;
+    $("cN").textContent=c.total;
+    $("shoeId").textContent=state.shoeId;
+
+    const m=compute();
+
+    $("bpB20").textContent = m.c20.bpTotal ? m.bPct.toFixed(0)+"%" : "-";
+    $("bpP20").textContent = m.c20.bpTotal ? m.pPct.toFixed(0)+"%" : "-";
+    $("t20").textContent   = m.c20.total ? m.tPct.toFixed(0)+"%" : "-";
+    $("edge20").textContent= m.c20.bpTotal ? (m.winner+" +"+m.edge.toFixed(0)+"%") : "-";
+    $("streak").textContent= streak(bpSeq(h));
+
+    $("conf").textContent = c.total ? String(m.conf) : "--";
+    $("confLabel").textContent = m.label;
+    $("note").innerHTML = (m.label==="NHIỄU")
+      ? `<span class="warn">${m.note}</span>`
+      : `<span class="ok">${m.note}</span>`;
+
+    $("noise").textContent = c.total ? m.noise+"%" : "-";
+    $("ent").textContent   = c.total ? m.ent.toFixed(2) : "-";
+    $("alt").textContent   = c.total ? Math.round(m.alt*100)+"%" : "-";
+    $("bb").textContent    = c.total ? Math.round(m.tr.pBB*100)+"%" : "-";
+    $("pp").textContent    = c.total ? Math.round(m.tr.pPP*100)+"%" : "-";
+
+    // bar
+    const b = m.c20.bpTotal ? m.bPct : 50;
+    const p = m.c20.bpTotal ? m.pPct : 50;
+    $("barB").style.width = b+"%";
+    $("barP").style.width = p+"%";
+    $("barText").textContent = `B ${Math.round(b)}% • P ${Math.round(p)}%`;
+
+    // Road
+    renderBead(h);
+    const bpAll = bpSeq(h);
+    const big = buildBigRoad(bpAll);
+    renderGrid("bigroad", big);
+
+    // History
+    const limit = parseInt($("limit").value,10);
+    const show = lastN(h, limit);
+    const el=$("history"); el.innerHTML="";
+    if(!show.length){
+      el.innerHTML = `<div class="mini">Chưa có lịch sử.</div>`;
+    }else{
+      show.forEach((it, idx)=>{
+        const d=document.createElement("div");
+        d.className="hitem "+(it.x==='B'?'b':it.x==='P'?'p':'t');
+        d.textContent=it.x;
+        d.title="Chạm để xoá ván này";
+        d.onclick=()=>{
+          const realIndex = h.length - show.length + idx;
+          state.history.splice(realIndex,1);
+          save(); render();
+        };
+        el.appendChild(d);
+      });
+    }
+
+    // Deep box
+    const deep = buildDeepText(h, m);
+    $("deepBox").textContent = deep;
+
+    // Data box
+    $("dataBox").textContent = JSON.stringify({shoeId:state.shoeId, total:h.length, last20: m.c20, conf:m.conf, noise:m.noise}, null, 2);
+
+    // Journal
+    if($("journal").value !== journal) $("journal").value = journal;
+  }
+
+  function buildDeepText(h, m){
+    const h20 = m.h20;
+    const bp20 = bpSeq(h20);
+    const c20 = m.c20;
+
+    // run-length distribution (BP only) on last20
+    const runs=[];
+    if(bp20.length){
+      let cur=1;
+      for(let i=1;i<bp20.length;i++){
+        if(bp20[i]===bp20[i-1]) cur++;
+        else { runs.push(cur); cur=1; }
+      }
+      runs.push(cur);
+    }
+    const avgRun = runs.length ? (runs.reduce((a,b)=>a+b,0)/runs.length).toFixed(2) : "-";
+    const maxRun = runs.length ? Math.max(...runs) : "-";
+
+    // last20 string
+    const seq = bp20.length ? bp20.join("") : "-";
+
+    // risk notes (no betting call)
+    const risk = [];
+    if(h.length<12) risk.push("DATA ÍT: <12 ván => sai số lớn.");
+    if(m.noise>=60) risk.push("NOISE CAO: đảo nhịp/cân/tie nhiều => dễ bẫy.");
+    if(m.stN>=6) risk.push("STREAK DÀI CUỐI CHUỖI: rủi ro đảo nhịp tăng.");
+    if(c20.T>=5) risk.push("TIE NHIỀU: bàn nhiễu, % B/P kém ổn định.");
+
+    const t = m.tr;
+    return [
+      "=== GOD (A) • Deep Diagnostics (Last20 focus) ===",
+      `Shoe #${state.shoeId}`,
+      `Total ván: ${h.length}`,
+      "",
+      "Last20 Count:",
+      `  B=${c20.B}  P=${c20.P}  T=${c20.T}  (BP=${c20.bpTotal})`,
+      "",
+      "Last20 BP sequence:",
+      `  ${seq}`,
+      "",
+      "Rates:",
+      `  B% (BP) = ${c20.bpTotal? m.bPct.toFixed(0)+"%":"-"}`,
+      `  P% (BP) = ${c20.bpTotal? m.pPct.toFixed(0)+"%":"-"}`,
+      `  Tie% (All) = ${c20.total? m.tPct.toFixed(0)+"%":"-"}`,
+      `  EDGE = ${c20.bpTotal? m.winner+" +"+m.edge.toFixed(0)+"%":"-"}`,
+      "",
+      "Noise / Complexity:",
+      `  Noise = ${m.noise}%  (0 tốt → 100 nhiễu)`,
+      `  Entropy(BP) = ${m.ent.toFixed(2)}  (≈1: cân 50/50 → nhiễu)`,
+      `  Alt(BP) = ${Math.round(m.alt*100)}%  (đảo liên tục → chop)`,
+      "",
+      "Transitions (Markov, BP only):",
+      `  B→B = ${Math.round(t.pBB*100)}%   B→P = ${t.bb+t.bp1? Math.round((t.bp1/(t.bb+t.bp1))*100):0}%`,
+      `  P→P = ${Math.round(t.pPP*100)}%   P→B = ${t.pb+t.pp? Math.round((t.pb/(t.pb+t.pp))*100):0}%`,
+      "",
+      "Runs (BP only, last20):",
+      `  Avg run = ${avgRun}   Max run = ${maxRun}   Current streak = ${m.st}`,
+      "",
+      "Confidence:",
+      `  CONF = ${m.conf}/100  • Label = ${m.label}`,
+      "",
+      "Risk flags:",
+      risk.length ? risk.map(x=>"  - "+x).join("\n") : "  - None",
+      "",
+      "NOTE: Tool chỉ cung cấp số liệu/độ nhiễu, không khuyến nghị đặt cược."
+    ].join("\n");
+  }
+
+  // Events
+  $("btnB").onclick=()=>{ state.history.push({x:'B',t:Date.now(),shoe:state.shoeId}); save(); render(); };
+  $("btnP").onclick=()=>{ state.history.push({x:'P',t:Date.now(),shoe:state.shoeId}); save(); render(); };
+  $("btnT").onclick=()=>{ state.history.push({x:'T',t:Date.now(),shoe:state.shoeId}); save(); render(); };
+  $("btnU").onclick=()=>{ state.history.pop(); save(); render(); };
+  $("btnR").onclick=()=>{
+    if(!confirm("Reset toàn bộ lịch sử?")) return;
+    state.history=[]; save(); render();
+  };
+  $("btnShoe").onclick=()=>{ state.shoeId=(state.shoeId||1)+1; save(); render(); };
+
+  $("limit").onchange=()=>render();
+
+  // Tabs
+  document.querySelectorAll(".tab").forEach(btn=>{
+    btn.onclick=()=>{
+      document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+      btn.classList.add("active");
+      const t=btn.dataset.tab;
+      $("tab-road").style.display = (t==="road") ? "" : "none";
+      $("tab-deep").style.display = (t==="deep") ? "" : "none";
+      $("tab-data").style.display = (t==="data") ? "" : "none";
+      $("tab-journal").style.display = (t==="journal") ? "" : "none";
+    };
+  });
+
+  // Data
+  $("btnExport").onclick=exportJSON;
+  $("file").onchange=(e)=>{ const f=e.target.files?.[0]; if(f) importJSON(f); e.target.value=""; };
+  $("btnClear").onclick=()=>{
+    if(!confirm("Clear lưu máy cho app này?")) return;
+    localStorage.removeItem(KEY);
+    localStorage.removeItem(KEYJ);
+    state={shoeId:1, history:[]};
+    journal="";
+    render();
+  };
+
+  // Journal
+  $("journal").value = journal;
+  $("btnSaveJ").onclick=()=>{
+    journal = $("journal").value || "";
+    localStorage.setItem(KEYJ, journal);
+    alert("Đã lưu ghi chú.");
+  };
+  $("btnClearJ").onclick=()=>{
+    if(!confirm("Xoá ghi chú?")) return;
+    journal="";
+    localStorage.setItem(KEYJ, journal);
+    render();
+  };
+
+  // Keyboard (nếu dùng PC)
+  window.addEventListener("keydown",(e)=>{
+    const k=e.key.toLowerCase();
+    if(k==="b") $("btnB").click();
+    if(k==="p") $("btnP").click();
+    if(k==="t") $("btnT").click();
+    if(k==="z") $("btnU").click();
+  });
+
+  // First render
+  render();
+})();
+</script>
+</body>
+</html>
