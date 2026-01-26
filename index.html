@@ -13,7 +13,157 @@
       --text:#eaf2ff;
       --muted:rgba(234,242,255,.68);
       --b:#20c997;
-      --p:#4dabf7;
+      --p:#4dabf7;<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Hào Baccarat — B (Rhythm Engine PRO)</title>
+  <meta name="theme-color" content="#0b1220" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div>
+        <h1>Hào Baccarat — <span class="tag">B · Rhythm Engine PRO</span></h1>
+        <p class="sub">Ghi lịch sử ván + đọc nhịp (Last20/Entropy/Noise/Phase). Lưu máy (localStorage).</p>
+      </div>
+      <div class="mini">
+        <div class="chip">Shoe: <b id="shoeId">1</b></div>
+        <div class="chip">Tổng: <b id="total">0</b></div>
+      </div>
+    </header>
+
+    <section class="panel">
+      <div class="btnRow">
+        <button class="btn b" id="btnB">Banker</button>
+        <button class="btn p" id="btnP">Player</button>
+        <button class="btn t" id="btnT">Tie</button>
+        <button class="btn ghost" id="btnU">Undo</button>
+        <button class="btn danger" id="btnR">Reset</button>
+      </div>
+
+      <div class="grid4">
+        <div class="stat">
+          <div class="k">B</div><div class="v" id="bCount">0</div>
+          <div class="s" id="bPct">0%</div>
+        </div>
+        <div class="stat">
+          <div class="k">P</div><div class="v" id="pCount">0</div>
+          <div class="s" id="pPct">0%</div>
+        </div>
+        <div class="stat">
+          <div class="k">T</div><div class="v" id="tCount">0</div>
+          <div class="s" id="tPct">0%</div>
+        </div>
+        <div class="stat">
+          <div class="k">B/P</div><div class="v" id="bpTotal">0</div>
+          <div class="s" id="bpPct">B 0% · P 0%</div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="box">
+          <div class="boxTitle">Nhịp (Last 20 — B/P)</div>
+          <div class="line" id="last20Line">-</div>
+          <div class="meta" id="last20Meta">B:0 · P:0 · Alt:0% · Tie(20):0%</div>
+        </div>
+
+        <div class="box">
+          <div class="boxTitle">Streak</div>
+          <div class="line" id="streakLine">-</div>
+          <div class="meta" id="longestLine">Longest: -</div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="box">
+          <div class="boxTitle">Entropy / Noise</div>
+          <div class="meter">
+            <div class="meterRow">
+              <span>Entropy(B/P)</span>
+              <b id="entropy">0%</b>
+            </div>
+            <div class="bar"><i id="entropyBar"></i></div>
+          </div>
+
+          <div class="meter">
+            <div class="meterRow">
+              <span>Noise</span>
+              <b id="noise">0%</b>
+            </div>
+            <div class="bar"><i id="noiseBar"></i></div>
+          </div>
+
+          <div class="tiny">
+            Entropy cao + Alt cao + Tie nhiều ⇒ dễ nhiễu/trap.
+          </div>
+        </div>
+
+        <div class="box score">
+          <div class="boxTitle">Confidence (0–100)</div>
+          <div class="big" id="confidence">45</div>
+          <div class="badge" id="phaseBadge">DỮ LIỆU ÍT</div>
+          <div class="hint" id="hint">
+            Nhập thêm ván để engine ổn định (ưu tiên đủ 8–12 ván B/P).
+          </div>
+        </div>
+      </div>
+
+      <div class="btnRow2">
+        <button class="btn small" id="btnNew">New shoe</button>
+        <button class="btn small" id="btnExport">Export</button>
+        <label class="btn small ghost file">
+          Import<input type="file" id="fileImport" accept="application/json" />
+        </label>
+        <button class="btn small ghost" id="btnClear">Clear lưu máy</button>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="history">History</button>
+        <button class="tab" data-tab="notes">Journal</button>
+        <button class="tab" data-tab="help">Help</button>
+      </div>
+
+      <div class="tabPane" id="tab-history">
+        <div class="row">
+          <div class="boxTitle">Lịch sử</div>
+          <select id="historyLimit">
+            <option value="50">Hiện 50</option>
+            <option value="100">Hiện 100</option>
+            <option value="200" selected>Hiện 200</option>
+            <option value="500">Hiện 500</option>
+          </select>
+        </div>
+        <div class="history" id="history"></div>
+        <div class="tiny">Chạm 1 mục để xóa đúng ván đó.</div>
+      </div>
+
+      <div class="tabPane hide" id="tab-notes">
+        <div class="boxTitle">Journal</div>
+        <textarea id="journal" placeholder="Ghi chú bàn: dealer, cảm giác nhịp, điểm vào/ra..."></textarea>
+        <div class="tiny">Tự lưu máy.</div>
+      </div>
+
+      <div class="tabPane hide" id="tab-help">
+        <div class="help">
+          <p><b>Entropy(B/P)</b>: càng gần 100% càng “cân bằng” (khó bám). <b>Alt</b> cao = đổi nhịp nhiều.</p>
+          <p><b>Noise</b> = pha nhiễu (entropy + alt + tie). Noise cao: ưu tiên quan sát/đợi.</p>
+          <p><b>Confidence</b> không phải “dự đoán chắc”, nó phản ánh “độ rõ nhịp” theo dữ liệu vừa nhập.</p>
+        </div>
+      </div>
+
+    </section>
+
+    <footer class="foot">
+      Mẹo: phím <b>B</b>/<b>P</b>/<b>T</b> (PC), Undo = <b>Z</b>. • Bản B: đọc nhịp + anti-trap.
+    </footer>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
       --t:#ffd43b;
       --bad:#ff5b6e;
       --ok:#9cff6b;
