@@ -2,170 +2,134 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#061425" />
-  <title>Hào Baccarat — C4 PRO</title>
-  <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hào Baccarat — C6 GOD MODE</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <meta name="theme-color" content="#0b1220" />
 </head>
 <body>
   <div class="wrap">
-    <header class="top card">
-      <div class="brand">
-        <div class="title">Hào Baccarat — C4 PRO</div>
-        <div class="sub">
-          Ghi lịch sử ván + xem Road (Bead/Big/BigEye/Small/Cockroach). Lưu máy (localStorage) + Export/Import + Offline.
+    <header class="hero">
+      <div>
+        <div class="title">Hào Baccarat — C6 GOD MODE</div>
+        <div class="subtitle">
+          Dashboard kiểu “pro trader”: Road + Thống kê sâu + Cảnh báo nhiễu/bẫy + Import/Export (lưu localStorage).
         </div>
       </div>
+      <div class="badge">BÙI HÀO · ELITE</div>
+    </header>
 
-      <div class="actions">
+    <section class="panel controls">
+      <div class="btnRow">
         <button class="btn b" id="btnB">Banker</button>
         <button class="btn p" id="btnP">Player</button>
         <button class="btn t" id="btnT">Tie</button>
-        <button class="btn u" id="btnUndo">Undo</button>
-        <button class="btn r" id="btnReset">Reset</button>
+        <button class="btn ghost" id="btnU">Undo</button>
+        <button class="btn danger" id="btnR">Reset</button>
       </div>
 
       <div class="chips">
-        <div class="chip"><span class="dot b"></span><span>B</span><b id="bCount">0</b></div>
-        <div class="chip"><span class="dot p"></span><span>P</span><b id="pCount">0</b></div>
-        <div class="chip"><span class="dot t"></span><span>T</span><b id="tCount">0</b></div>
-        <div class="chip"><span>总</span><b id="total">0</b></div>
-        <div class="chip"><span>Streak</span><b id="streak">-</b></div>
-        <div class="chip"><span>Longest</span><b id="longest">-</b></div>
+        <div class="chip"><span class="dot b"></span> B: <b id="bCount">0</b></div>
+        <div class="chip"><span class="dot p"></span> P: <b id="pCount">0</b></div>
+        <div class="chip"><span class="dot t"></span> T: <b id="tCount">0</b></div>
+        <div class="chip"><span class="dot g"></span> Tổng: <b id="total">0</b></div>
       </div>
 
-      <div class="mini">
-        <div class="miniCard">
-          <div class="miniLabel">Last 20 (B/P)</div>
-          <div class="miniVal" id="last20bp">-</div>
+      <div class="grid2">
+        <div class="card mini">
+          <div class="k">Streak hiện tại</div>
+          <div class="v" id="streakNow">-</div>
         </div>
-        <div class="miniCard">
-          <div class="miniLabel">Tie rate (Last 20)</div>
-          <div class="miniVal" id="tie20">-</div>
-        </div>
-        <div class="miniCard">
-          <div class="miniLabel">Alt rate (Last 20, B/P)</div>
-          <div class="miniVal" id="alt20">-</div>
+        <div class="card mini">
+          <div class="k">Longest streak</div>
+          <div class="v" id="streakMax">-</div>
         </div>
       </div>
 
-      <div class="toolRow">
-        <button class="btn s" id="btnExport">Export</button>
-        <button class="btn s" id="btnImport">Import</button>
-        <button class="btn s" id="btnInstall">Cài (PWA)</button>
-        <span class="hint">Mẹo: phím B/P/T (nếu dùng PC), Undo=Z</span>
-      </div>
-    </header>
-
-    <main class="grid">
-      <section class="card">
-        <div class="secHead">
-          <div>
-            <div class="secTitle">Lịch sử</div>
-            <div class="secSub">Chạm 1 mục để xoá đúng ván đó.</div>
-          </div>
-          <div class="secRight">
-            <select id="historyLimit">
-              <option value="50">Hiện 50</option>
-              <option value="100">Hiện 100</option>
-              <option value="200" selected>Hiện 200</option>
-              <option value="9999">Hiện ALL</option>
-            </select>
-          </div>
+      <div class="grid2">
+        <div class="card mini">
+          <div class="k">Nhịp đảo (last 20, B/P)</div>
+          <div class="v" id="alt20">-</div>
         </div>
-        <div id="history" class="historyBox">Chưa có lịch sử.</div>
-        <div class="footNote">
-          App chỉ ghi/hiển thị Road & thống kê — không phải công cụ dự đoán chắc thắng.
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="secHead">
-          <div>
-            <div class="secTitle">Roads</div>
-            <div class="secSub">Big Road có Tie đánh dấu góc (xN).</div>
-          </div>
-          <div class="secRight">
-            <label class="toggle">
-              <input type="checkbox" id="toggleGrid" checked>
-              <span>Viền ô</span>
-            </label>
-            <label class="toggle">
-              <input type="checkbox" id="toggleCompact" checked>
-              <span>Gọn</span>
-            </label>
-          </div>
-        </div>
-
-        <div class="roads">
-          <div class="road">
-            <div class="roadHead">
-              <b>Bead Plate</b><span>72 ván</span>
-            </div>
-            <div class="board"><div id="bead" class="matrix"></div></div>
-          </div>
-
-          <div class="road">
-            <div class="roadHead">
-              <b>Big Road</b><span>6 hàng + Tie góc</span>
-            </div>
-            <div class="board"><div id="big" class="matrix big"></div></div>
-          </div>
-
-          <div class="road">
-            <div class="roadHead">
-              <b>Big Eye Road</b><span>Red/Blue</span>
-            </div>
-            <div class="board"><div id="eye" class="matrix"></div></div>
-          </div>
-
-          <div class="road">
-            <div class="roadHead">
-              <b>Small Road</b><span>Red/Blue</span>
-            </div>
-            <div class="board"><div id="small" class="matrix"></div></div>
-          </div>
-
-          <div class="road span2">
-            <div class="roadHead">
-              <b>Cockroach Road</b><span>Red/Blue</span>
-            </div>
-            <div class="board"><div id="cock" class="matrix"></div></div>
-            <div class="legend">
-              <span><i class="lg b"></i> Banker</span>
-              <span><i class="lg p"></i> Player</span>
-              <span><i class="lg t"></i> Tie</span>
-              <span><i class="lg red"></i> Red</span>
-              <span><i class="lg blue"></i> Blue</span>
-              <span><i class="lg tie"></i> Tie mark</span>
-            </div>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <div class="toast" id="toast"></div>
-
-    <!-- Modal -->
-    <div class="modal hidden" id="modal">
-      <div class="modalCard">
-        <div class="modalHead">
-          <b id="modalTitle">Export</b>
-          <button class="x" id="modalClose">✕</button>
-        </div>
-        <div class="modalBody">
-          <textarea id="modalText" spellcheck="false" placeholder=""></textarea>
-          <div class="modalBtns">
-            <button class="btn s" id="btnCopy">Copy</button>
-            <button class="btn s" id="btnPaste">Dán từ clipboard</button>
-            <button class="btn p" id="btnApply">Apply</button>
-          </div>
-          <div class="modalHint" id="modalHint"></div>
+        <div class="card mini">
+          <div class="k">Tie rate (last 20)</div>
+          <div class="v" id="tie20">-</div>
         </div>
       </div>
-    </div>
 
+      <div class="scoreBox">
+        <div class="scoreLeft">
+          <div class="k">Điểm tín hiệu (0–100)</div>
+          <div class="score" id="score">50</div>
+          <div class="tag" id="tag">TRUNG TÍNH</div>
+        </div>
+        <div class="scoreRight">
+          <div class="k">Giải thích nhanh</div>
+          <div class="explain" id="explain">Chưa đủ dữ liệu → ưu tiên quan sát thêm.</div>
+          <div class="warn" id="warn"></div>
+        </div>
+      </div>
+
+      <div class="btnRow2">
+        <button class="btn ghost" id="btnNewShoe">New shoe</button>
+        <button class="btn ghost" id="btnExport">Export</button>
+        <label class="btn ghost fileBtn">
+          Import
+          <input type="file" id="fileImport" accept="application/json" />
+        </label>
+        <button class="btn ghost" id="btnClearLS">Clear lưu máy</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="tabs">
+        <button class="tab active" data-tab="roads">Road</button>
+        <button class="tab" data-tab="stats">Stats</button>
+        <button class="tab" data-tab="journal">Journal</button>
+      </div>
+
+      <div class="tabBody active" id="tab-roads">
+        <div class="roadGrid">
+          <div class="card">
+            <div class="cardTitle">Bead Plate (lịch theo ván) · hiển thị 72 ván</div>
+            <div class="bead" id="bead"></div>
+          </div>
+          <div class="card">
+            <div class="cardTitle">Big Road (6 hàng)</div>
+            <div class="bigroad" id="bigroad"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabBody" id="tab-stats">
+        <div class="card">
+          <div class="cardTitle">GOD MODE — Thống kê sâu</div>
+          <div class="statsGrid" id="statsGrid"></div>
+        </div>
+
+        <div class="card">
+          <div class="cardTitle">Ma trận chuyển trạng thái (Markov) — chỉ B/P (bỏ Tie)</div>
+          <div class="mono" id="markov">-</div>
+        </div>
+      </div>
+
+      <div class="tabBody" id="tab-journal">
+        <div class="card">
+          <div class="cardTitle">Ghi chú phiên (Journal)</div>
+          <textarea id="note" rows="7" placeholder="Ghi chú: bàn nào, giờ nào, cảm giác nhiễu/bẫy, v.v..."></textarea>
+          <div class="muted">Tự lưu trên máy. Mẹo: ghi “cut-card”, “dealer change”, “table change”…</div>
+        </div>
+
+        <div class="card">
+          <div class="cardTitle">Lịch sử (chạm 1 mục để xoá đúng ván đó)</div>
+          <div class="history" id="history"></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="foot">
+      Mẹo: phím B/P/T (nếu dùng PC). Undo=Z. · © Bùi Hào — Baccarat Elite
+    </footer>
   </div>
 
   <script src="./app.js"></script>
