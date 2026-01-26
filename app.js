@@ -1,513 +1,490 @@
-/* =========================
-   Hào Baccarat — C4 PRO
-   - Roads: Bead, Big Road (Tie mark), Big Eye, Small, Cockroach
-   - Export/Import, Offline (SW), PWA install
-   NOTE: tracking/visualization only (not prediction).
-========================= */
+/*  Hào Baccarat — C6 GOD MODE
+    - Lưu localStorage
+    - Bead Plate (72) + Big Road (6 rows)
+    - Stats sâu + cảnh báo nhiễu/bẫy
+    - Export/Import JSON + Journal
+*/
+const KEY = "hao_baccarat_c6_godmode_v1";
 
-const KEY = "hao_baccarat_c4_history_v1";
-
-/** history item: { x:'B'|'P'|'T', t:number } */
-let history = load();
-
-function load(){
-  try{ return JSON.parse(localStorage.getItem(KEY) || "[]"); }
-  catch{ return []; }
-}
-function save(){
-  localStorage.setItem(KEY, JSON.stringify(history));
-}
-
-const $ = (id)=>document.getElementById(id);
-
-function toast(msg){
-  const el = $("toast");
-  el.textContent = msg;
-  el.classList.add("show");
-  setTimeout(()=>el.classList.remove("show"), 1200);
-}
-
-/* ---------- buttons ---------- */
-$("btnB").onclick = ()=>add("B");
-$("btnP").onclick = ()=>add("P");
-$("btnT").onclick = ()=>add("T");
-$("btnUndo").onclick = undo;
-$("btnReset").onclick = resetAll;
-
-document.addEventListener("keydown",(e)=>{
-  const k = e.key.toLowerCase();
-  if(k==="b") add("B");
-  if(k==="p") add("P");
-  if(k==="t") add("T");
-  if(k==="z") undo();
-});
-
-$("toggleGrid").onchange = render;
-$("toggleCompact").onchange = render;
-$("historyLimit").onchange = render;
-
-/* ---------- modal ---------- */
-let modalMode = "export";
-$("btnExport").onclick = ()=>openModal("export");
-$("btnImport").onclick = ()=>openModal("import");
-$("modalClose").onclick = closeModal;
-$("btnCopy").onclick = copyModal;
-$("btnPaste").onclick = pasteModal;
-$("btnApply").onclick = applyModal;
-
-function openModal(mode){
-  modalMode = mode;
-  $("modal").classList.remove("hidden");
-  $("modalTitle").textContent = mode === "export" ? "Export lịch sử" : "Import lịch sử";
-  $("modalHint").textContent =
-    mode === "export"
-      ? "Copy đoạn này để lưu/đổi máy. Không chia sẻ công khai nếu bạn không muốn lộ lịch sử."
-      : "Dán đoạn Export vào ô rồi Apply.";
-  if(mode==="export"){
-    $("modalText").value = exportData();
-    $("btnApply").style.display = "none";
-  }else{
-    $("modalText").value = "";
-    $("btnApply").style.display = "inline-flex";
-  }
-}
-function closeModal(){ $("modal").classList.add("hidden"); }
-async function copyModal(){
-  const text = $("modalText").value.trim();
-  if(!text) return toast("Trống.");
-  try{
-    await navigator.clipboard.writeText(text);
-    toast("Đã copy.");
-  }catch{
-    toast("Không copy được (trình duyệt chặn).");
-  }
-}
-async function pasteModal(){
-  try{
-    const t = await navigator.clipboard.readText();
-    $("modalText").value = t || "";
-    toast("Đã dán.");
-  }catch{
-    toast("Không dán được (trình duyệt chặn).");
-  }
-}
-function applyModal(){
-  if(modalMode!=="import") return;
-  const raw = $("modalText").value.trim();
-  if(!raw) return toast("Chưa dán dữ liệu.");
-  const ok = importData(raw);
-  if(ok){
-    closeModal();
-    toast("Import OK.");
-    render();
-  }else{
-    toast("Import lỗi. Dữ liệu không đúng.");
-  }
-}
-
-/* ---------- core actions ---------- */
-function add(x){
-  history.push({ x, t: Date.now() });
-  save();
-  render();
-}
-function undo(){
-  if(history.length===0) return;
-  history.pop();
-  save();
-  render();
-}
-function resetAll(){
-  if(!confirm("Reset toàn bộ lịch sử?")) return;
-  history = [];
-  save();
-  render();
-}
-function removeAt(indexFromEnd){
-  // UI shows latest first; indexFromEnd is in that list
-  const idx = history.length - 1 - indexFromEnd;
-  if(idx<0 || idx>=history.length) return;
-  history.splice(idx,1);
-  save();
-  render();
-}
-
-/* =========================
-   Stats helpers
-========================= */
-function lastN(arr,n){ return arr.length<=n ? arr.slice() : arr.slice(arr.length-n); }
-
-function countAll(arr){
-  let b=0,p=0,t=0;
-  for(const it of arr){
-    if(it.x==="B") b++;
-    else if(it.x==="P") p++;
-    else t++;
-  }
-  return {b,p,t,total:arr.length};
-}
-
-function bpOnly(arr){ return arr.filter(it=>it.x==="B"||it.x==="P"); }
-
-function streak(arr){
-  const bp = bpOnly(arr);
-  if(bp.length===0) return {side:"-",len:0,text:"-"};
-  const last = bp[bp.length-1].x;
-  let len=1;
-  for(let i=bp.length-2;i>=0;i--){
-    if(bp[i].x===last) len++;
-    else break;
-  }
-  return {side:last,len,text:`${last} x${len}`};
-}
-
-function longestStreak(arr){
-  const bp = bpOnly(arr);
-  if(bp.length===0) return {side:"-",len:0,text:"-"};
-  let bestSide = bp[0].x, best=1;
-  let curSide = bp[0].x, cur=1;
-  for(let i=1;i<bp.length;i++){
-    if(bp[i].x===curSide) cur++;
-    else { curSide=bp[i].x; cur=1; }
-    if(cur>best){ best=cur; bestSide=curSide; }
-  }
-  return {side:bestSide,len:best,text:`${bestSide} x${best}`};
-}
-
-function altRateBP(arr){
-  const bp = arr.map(it=>it.x);
-  if(bp.length<2) return {pct:0,text:"-"};
-  let alt=0;
-  for(let i=1;i<bp.length;i++) if(bp[i]!==bp[i-1]) alt++;
-  const pct = Math.round(alt/(bp.length-1)*100);
-  return {pct,text:`${pct}% (đổi ${alt}/${bp.length-1})`};
-}
-
-function tieRate(arr){
-  if(arr.length===0) return {pct:0,text:"-"};
-  const t = arr.filter(it=>it.x==="T").length;
-  const pct = Math.round(t/arr.length*100);
-  return {pct,text:`${pct}% (${t}/${arr.length})`};
-}
-
-function lastBPText(arr){
-  const bp = bpOnly(arr).map(it=>it.x);
-  if(bp.length===0) return "-";
-  const last = lastN(bp,20);
-  const b = last.filter(x=>x==="B").length;
-  const p = last.filter(x=>x==="P").length;
-  return `B:${b} • P:${p} • Tổng:${last.length}`;
-}
-
-/* =========================
-   Road builders (Big Road + Derived)
-   - Big Road ignores Tie placements, but ties attach to last Big cell
-========================= */
-
-function buildBigRoadWithTies(arr){
-  // Big road cells: {v:'B'|'P', tie:number}
-  const seq = [];
-  let tiePending = 0;
-
-  // convert history -> B/P cells, ties attached to previous B/P cell
-  for(const it of arr){
-    if(it.x==="T"){
-      tiePending++;
-      continue;
-    }
-    // B/P
-    seq.push({ v: it.x, tie: tiePending });
-    tiePending = 0;
-  }
-  // if ties occur at very beginning with no B/P yet, we ignore them visually
-  // (could also show tie on bead only)
-
-  const cols = []; // each col is array len 6, cell or null
-  let c=0,r=0;
-
-  function ensureCol(i){
-    if(!cols[i]) cols[i] = Array(6).fill(null);
-  }
-  if(seq.length===0) return {cols, seq};
-
-  ensureCol(0);
-  cols[0][0] = seq[0];
-  c=0; r=0;
-
-  for(let i=1;i<seq.length;i++){
-    const cur = seq[i];
-    const prev = seq[i-1];
-
-    if(cur.v === prev.v){
-      // same side: go down if possible else go right keeping row
-      if(r<5 && cols[c][r+1]===null){
-        r++;
-        cols[c][r] = cur;
-      }else{
-        c++;
-        ensureCol(c);
-        cols[c][r] = cur;
-      }
-    }else{
-      // change: new column, row = 0
-      c++;
-      r=0;
-      ensureCol(c);
-      cols[c][r] = cur;
-    }
-  }
-  return { cols, seq };
-}
-
-/**
- * Build derived road sequence (R/B) based on Big Road placements.
- * Standard-ish practical rules:
- * For each Big Road placement at (col=c, row=r) in bigCols:
- *  - Skip until enough reference columns exist.
- *  - If r==0 (new column): compare length of previous column and the reference column:
- *      len(prevCol) == len(refCol) => Red else Blue
- *  - If r>0 (continuation): compare presence at (refColIndex, r):
- *      exists => Red else Blue
- *
- * offset: 1=BigEye(ref col = c-2 for r==0, and c-1 for r>0?) -> we generalize using:
- *   For r==0: compare (c-1) vs (c-1-offset)
- *   For r>0: compare presence at (c-offset, r)
- * Using offset 2 for BigEye, 3 for Small, 4 for Cockroach (works well visually).
- */
-function colLen(col){
-  let n=0;
-  for(let r=0;r<6;r++) if(col[r]) n++;
-  return n;
-}
-
-function buildDerivedSeq(bigCols, offset){
-  const seq = [];
-  for(let c=0;c<bigCols.length;c++){
-    for(let r=0;r<6;r++){
-      if(!bigCols[c]?.[r]) continue;
-
-      if(r===0){
-        const a = c-1;
-        const b = c-1-offset;
-        if(a<0 || b<0) continue;
-        const color = (colLen(bigCols[a]) === colLen(bigCols[b])) ? "R" : "B";
-        seq.push(color);
-      }else{
-        const ref = c-offset;
-        if(ref<0) continue;
-        const color = bigCols[ref]?.[r] ? "R" : "B";
-        seq.push(color);
-      }
-    }
-  }
-  return seq;
-}
-
-function buildRoadFromColorSeq(seq){
-  // place colors like Big Road placement (6 rows)
-  const cols = [];
-  let c=0,r=0;
-
-  function ensureCol(i){
-    if(!cols[i]) cols[i] = Array(6).fill(null);
-  }
-  if(seq.length===0) return cols;
-
-  ensureCol(0);
-  cols[0][0] = seq[0];
-  c=0;r=0;
-
-  for(let i=1;i<seq.length;i++){
-    const cur = seq[i];
-    const prev = seq[i-1];
-
-    if(cur===prev){
-      if(r<5 && cols[c][r+1]===null){
-        r++;
-        cols[c][r]=cur;
-      }else{
-        c++;
-        ensureCol(c);
-        cols[c][r]=cur;
-      }
-    }else{
-      c++;
-      r=0;
-      ensureCol(c);
-      cols[c][r]=cur;
-    }
-  }
-  return cols;
-}
-
-function buildBead(arr){
-  // 72 items, 6 rows fill downward then next col
-  const last = lastN(arr,72);
-  const cols = [];
-  let c=0,r=0;
-  cols[c]=Array(6).fill(null);
-  for(const it of last){
-    cols[c][r]=it.x;
-    r++;
-    if(r>=6){ r=0; c++; cols[c]=Array(6).fill(null); }
-  }
-  return cols;
-}
-
-/* =========================
-   Render matrices
-========================= */
-function renderMatrix(el, cols, palette, opts={}){
-  const maxCols = 70;
-  const slice = cols.length>maxCols ? cols.slice(cols.length-maxCols) : cols;
-
-  const gridOn = $("toggleGrid").checked;
-  const compact = $("toggleCompact").checked;
-
-  el.classList.toggle("compact", compact);
-  el.innerHTML="";
-
-  for(let c=0;c<slice.length;c++){
-    const col = slice[c] || Array(6).fill(null);
-    for(let r=0;r<6;r++){
-      const v = col[r];
-      const div = document.createElement("div");
-      div.className = "cell";
-      if(gridOn) div.classList.add("gridOn");
-      if(compact) div.classList.add("compact");
-
-      if(v){
-        const cls = palette[v];
-        if(cls) div.classList.add(cls);
-      }
-
-      // tie mark for big road cells
-      if(opts.big && v && typeof v === "object"){
-        // v = {v:'B'|'P', tie:n}
-        const cls = palette[v.v];
-        if(cls) div.classList.add(cls);
-        if(v.tie && v.tie>0){
-          div.classList.add("tieMark");
-          div.dataset.t = `x${v.tie}`;
-        }
-      }
-
-      el.appendChild(div);
-    }
-  }
-}
-
-/* =========================
-   Export/Import
-========================= */
-function exportData(){
-  // small & safe package
-  const payload = {
-    v:1,
-    created: Date.now(),
-    items: history
-  };
-  return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-}
-
-function importData(raw){
-  try{
-    const json = decodeURIComponent(escape(atob(raw)));
-    const payload = JSON.parse(json);
-    if(!payload || !Array.isArray(payload.items)) return false;
-
-    // validate items
-    const items = payload.items
-      .filter(it=>it && (it.x==="B"||it.x==="P"||it.x==="T") && typeof it.t==="number")
-      .map(it=>({x:it.x,t:it.t}));
-
-    history = items;
-    save();
-    return true;
-  }catch{
-    return false;
-  }
-}
-
-/* =========================
-   PWA install + SW
-========================= */
-let deferredPrompt = null;
-window.addEventListener("beforeinstallprompt",(e)=>{
-  e.preventDefault();
-  deferredPrompt = e;
-  $("btnInstall").disabled = false;
-});
-$("btnInstall").onclick = async ()=>{
-  if(!deferredPrompt) return toast("Nếu không hiện, hãy 'Add to Home screen' trong menu trình duyệt.");
-  deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
-  deferredPrompt = null;
+const state = load() || {
+  shoeId: new Date().toISOString(),
+  history: [],          // {x:'B'|'P'|'T', t:ms}
+  note: ""
 };
 
-if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("./sw.js").catch(()=>{});
+const $ = (id) => document.getElementById(id);
+
+function save() {
+  localStorage.setItem(KEY, JSON.stringify(state));
 }
 
-/* =========================
-   Render all
-========================= */
-function render(){
-  const {b,p,t,total} = countAll(history);
-  $("bCount").textContent = b;
-  $("pCount").textContent = p;
-  $("tCount").textContent = t;
-  $("total").textContent = total;
+function load() {
+  try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; }
+}
 
-  const st = streak(history);
-  const lg = longestStreak(history);
-  $("streak").textContent = st.text;
-  $("longest").textContent = lg.text;
+/* ---------- Core actions ---------- */
+function addResult(x) {
+  state.history.push({ x, t: Date.now() });
+  save();
+  render();
+}
 
-  $("last20bp").textContent = lastBPText(history);
-  $("tie20").textContent = tieRate(lastN(history,20)).text;
-  $("alt20").textContent = altRateBP(lastN(bpOnly(history),20)).text;
+function undo() {
+  state.history.pop();
+  save();
+  render();
+}
 
-  // history list (latest first)
-  const limit = parseInt($("historyLimit").value,10);
-  if(history.length===0){
-    $("history").textContent = "Chưa có lịch sử.";
-  }else{
-    const last = (limit===9999) ? history.slice().reverse() : lastN(history,limit).slice().reverse();
-    $("history").innerHTML = last.map((it,idx)=>{
-      const x = it.x;
-      const dotCls = x==="B" ? "b" : x==="P" ? "p" : "t";
-      const time = new Date(it.t).toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"});
-      return `
-        <span class="tag" onclick="removeAt(${idx})" title="Chạm để xoá ván này">
-          <span class="badgeDot ${dotCls}"></span>
-          <b>${x}</b>
-          <span class="time">${time}</span>
-        </span>
-      `;
-    }).join("");
+function resetAll() {
+  if (!confirm("Reset toàn bộ lịch sử ván?")) return;
+  state.history = [];
+  save();
+  render();
+}
+
+function newShoe() {
+  if (!confirm("New shoe: giữ ghi chú, xoá lịch sử ván?")) return;
+  state.shoeId = new Date().toISOString();
+  state.history = [];
+  save();
+  render();
+}
+
+function clearLocal() {
+  if (!confirm("Xoá dữ liệu lưu máy (localStorage)?")) return;
+  localStorage.removeItem(KEY);
+  location.reload();
+}
+
+/* ---------- Export / Import ---------- */
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `hao-baccarat-${state.shoeId.replace(/[:.]/g,"-")}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!data || !Array.isArray(data.history)) throw new Error("Bad file");
+      state.shoeId = data.shoeId || new Date().toISOString();
+      state.history = data.history;
+      state.note = data.note || "";
+      save();
+      render();
+      alert("Import OK!");
+    } catch (e) {
+      alert("File import không hợp lệ.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ---------- Metrics ---------- */
+function onlyBP(arr) {
+  return arr.filter(r => r.x === "B" || r.x === "P").map(r => r.x);
+}
+
+function lastN(arr, n) {
+  return arr.slice(Math.max(0, arr.length - n));
+}
+
+function streakInfo(bpArr) {
+  if (bpArr.length === 0) return { now: "-", max: 0 };
+  let max = 1, cur = 1;
+  for (let i = 1; i < bpArr.length; i++) {
+    if (bpArr[i] === bpArr[i-1]) cur++;
+    else cur = 1;
+    if (cur > max) max = cur;
+  }
+  // current streak
+  let now = 1;
+  for (let i = bpArr.length - 1; i > 0; i--) {
+    if (bpArr[i] === bpArr[i-1]) now++;
+    else break;
+  }
+  return { now: `${bpArr[bpArr.length-1]} × ${now}`, max };
+}
+
+function alternationRate(bpArr) {
+  if (bpArr.length < 2) return 0;
+  let alt = 0;
+  for (let i = 1; i < bpArr.length; i++) if (bpArr[i] !== bpArr[i-1]) alt++;
+  return alt / (bpArr.length - 1); // 0..1
+}
+
+function tieRate(histArr) {
+  if (histArr.length === 0) return 0;
+  const t = histArr.filter(r => r.x === "T").length;
+  return t / histArr.length; // 0..1
+}
+
+function entropyBP(bpArr) {
+  // Shannon entropy for B/P distribution (0..1)
+  if (bpArr.length === 0) return 0;
+  const b = bpArr.filter(x => x === "B").length / bpArr.length;
+  const p = 1 - b;
+  const H = (q) => (q <= 0 ? 0 : -q * Math.log2(q));
+  const h = H(b) + H(p); // max 1 when 50/50
+  return Math.min(1, h);
+}
+
+function markov(bpArr) {
+  // transitions: BB, BP, PB, PP
+  const m = { BB:0, BP:0, PB:0, PP:0 };
+  if (bpArr.length < 2) return m;
+  for (let i = 1; i < bpArr.length; i++) {
+    const k = bpArr[i-1] + bpArr[i];
+    m[k] = (m[k] || 0) + 1;
+  }
+  return m;
+}
+
+function markovText(m) {
+  const bb = m.BB || 0, bp = m.BP || 0, pb = m.PB || 0, pp = m.PP || 0;
+  const fromB = bb + bp;
+  const fromP = pb + pp;
+  const pBB = fromB ? (bb/fromB) : 0;
+  const pBP = fromB ? (bp/fromB) : 0;
+  const pPB = fromP ? (pb/fromP) : 0;
+  const pPP = fromP ? (pp/fromP) : 0;
+
+  const fmt = (x)=> (x*100).toFixed(1)+"%";
+  return [
+    `From B → B: ${fmt(pBB)} | From B → P: ${fmt(pBP)}`,
+    `From P → B: ${fmt(pPB)} | From P → P: ${fmt(pPP)}`,
+    `Counts: BB=${bb}, BP=${bp}, PB=${pb}, PP=${pp}`
+  ].join("\n");
+}
+
+function scoreEngine(hist) {
+  // “Pro trader style”: đo cấu trúc + nhiễu, không hứa hẹn win.
+  const bp = onlyBP(hist);
+  const hist20 = lastN(hist, 20);
+  const bp20 = onlyBP(hist20);
+
+  const alt = alternationRate(bp20);      // 0..1
+  const tr  = tieRate(hist20);            // 0..1
+  const ent = entropyBP(bp20);            // 0..1
+  const { now, max } = streakInfo(bp20);
+
+  // volatility proxy: nhiều đổi nhịp + entropy cao => nhiễu
+  const noise = 0.55*alt + 0.45*ent;      // 0..1
+  // structure proxy: streak vừa phải + alt vừa phải => “có dạng”
+  const structure = 1 - Math.abs(alt - 0.55); // peak near 0.55
+  const tiePenalty = Math.min(1, tr / 0.25);  // tie >25% coi là nhiễu mạnh
+
+  // base score
+  let score = 60;
+
+  // dữ liệu ít -> kéo về trung tính
+  if (hist.length < 12) score -= 8;
+  if (hist.length < 6) score -= 12;
+
+  // noise giảm điểm
+  score -= 18 * noise;
+
+  // tie giảm điểm
+  score -= 12 * tiePenalty;
+
+  // structure tăng nhẹ (không quá tay)
+  score += 10 * structure;
+
+  // streak quá dài => cảnh báo “đuối/đảo chiều”
+  const lastChar = bp20[bp20.length-1];
+  let curStreak = 1;
+  for (let i = bp20.length - 1; i > 0; i--) {
+    if (bp20[i] === bp20[i-1]) curStreak++;
+    else break;
+  }
+  if (curStreak >= 5) score -= 10; // risk: late streak
+
+  // clamp
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  // tag + explain
+  let tag = "TRUNG TÍNH";
+  if (score >= 75) tag = "ỔN ĐỊNH";
+  if (score >= 85) tag = "RÕ NHỊP";
+  if (score <= 45) tag = "NHIỄU";
+  if (score <= 30) tag = "RẤT NHIỄU";
+
+  const explain = [];
+  if (hist.length < 12) explain.push("Dữ liệu còn ít → ưu tiên quan sát thêm.");
+  explain.push(`Alt20=${Math.round(alt*100)}% · Tie20=${Math.round(tr*100)}% · Entropy(B/P)≈${Math.round(ent*100)}%`);
+  explain.push(`Streak: ${now} · Longest(20): ${max}`);
+
+  const warn = [];
+  if (tr >= 0.20) warn.push("Tie nhiều → không kết luận đổi cầu vội.");
+  if (noise >= 0.70) warn.push("Nhịp đảo + phân bố 50/50 → nhiễu cao, dễ bẫy.");
+  if (curStreak >= 5) warn.push("Bệt dài → cuối bệt dễ ‘gãy’, cân nhắc chờ xác nhận.");
+  if (hist.length >= 20 && score >= 80) warn.push("Có dạng, nhưng vẫn ưu tiên vào nhỏ + kỷ luật Undo/Reset khi lệch nhịp.");
+
+  return { score, tag, explain: explain.join(" "), warn: warn.join(" · ") };
+}
+
+/* ---------- Road rendering ---------- */
+function renderBead(hist) {
+  const bead = $("bead");
+  bead.innerHTML = "";
+  const show = lastN(hist, 72);
+  for (const r of show) {
+    const d = document.createElement("div");
+    d.className = "cell " + (r.x === "B" ? "b" : r.x === "P" ? "p" : "t");
+    d.title = new Date(r.t).toLocaleTimeString();
+    d.textContent = r.x;
+    bead.appendChild(d);
+  }
+}
+
+function buildBigRoad(hist) {
+  // Standard-ish big road, 6 rows; tie doesn't move position (we mark tie count on cell).
+  const bp = hist.filter(r => r.x === "B" || r.x === "P" || r.x === "T").map(r => r.x);
+  const rows = 6;
+
+  // each cell: {x:'B'|'P', ties:n}
+  const grid = []; // grid[col][row]
+  let col = 0, row = 0;
+  let last = null;
+
+  const ensure = (c)=> { if (!grid[c]) grid[c] = Array(rows).fill(null); };
+
+  for (const x of bp) {
+    if (x === "T") {
+      // add tie marker to current cell
+      if (last && grid[col] && grid[col][row]) grid[col][row].ties = (grid[col][row].ties || 0) + 1;
+      continue;
+    }
+
+    if (last === null) {
+      ensure(col);
+      grid[col][row] = { x, ties: 0 };
+      last = x;
+      continue;
+    }
+
+    if (x === last) {
+      // try go down
+      if (row + 1 < rows && grid[col][row+1] === null) {
+        row++;
+      } else {
+        // go right (stay same row)
+        col++;
+      }
+    } else {
+      // new color -> new column, reset row
+      col++;
+      row = 0;
+    }
+
+    ensure(col);
+    // collision: if occupied, push right until free (common big-road behavior)
+    while (grid[col][row] !== null) {
+      col++;
+      ensure(col);
+    }
+    grid[col][row] = { x, ties: 0 };
+    last = x;
   }
 
-  // roads
-  const bead = buildBead(history);
-  renderMatrix($("bead"), bead, {B:"cB",P:"cP",T:"cT"});
-
-  const bigPack = buildBigRoadWithTies(history);
-  // big cols contain objects -> use opts.big
-  renderMatrix($("big"), bigPack.cols, {B:"cB",P:"cP"}, {big:true});
-
-  // derived roads
-  const eyeSeq = buildDerivedSeq(bigPack.cols, 2);
-  const smallSeq = buildDerivedSeq(bigPack.cols, 3);
-  const cockSeq = buildDerivedSeq(bigPack.cols, 4);
-
-  const eye = buildRoadFromColorSeq(eyeSeq);
-  const small = buildRoadFromColorSeq(smallSeq);
-  const cock = buildRoadFromColorSeq(cockSeq);
-
-  renderMatrix($("eye"), eye, {R:"cRed",B:"cBlue"});
-  renderMatrix($("small"), small, {R:"cRed",B:"cBlue"});
-  renderMatrix($("cock"), cock, {R:"cRed",B:"cBlue"});
+  return grid;
 }
 
-render();
+function renderBigRoad(grid) {
+  const root = $("bigroad");
+  root.innerHTML = "";
+
+  const rows = 6;
+  // measure columns to show (cap for mobile)
+  const cols = Math.min(grid.length, 40);
+
+  for (let r = 0; r < rows; r++) {
+    const rowEl = document.createElement("div");
+    rowEl.className = "brRow";
+    for (let c = Math.max(0, grid.length - cols); c < grid.length; c++) {
+      const cell = document.createElement("div");
+      cell.className = "brCell";
+      const v = grid[c]?.[r] || null;
+      if (v) {
+        cell.classList.add(v.x === "B" ? "b" : "p");
+        cell.textContent = v.ties ? `${v.x}${v.ties}` : v.x;
+      } else {
+        cell.textContent = "";
+      }
+      rowEl.appendChild(cell);
+    }
+    root.appendChild(rowEl);
+  }
+}
+
+/* ---------- History list ---------- */
+function renderHistory(hist) {
+  const root = $("history");
+  root.innerHTML = "";
+  if (hist.length === 0) {
+    root.innerHTML = `<div class="muted">Chưa có lịch sử. Bấm Banker/Player/Tie để bắt đầu.</div>`;
+    return;
+  }
+  const list = document.createElement("div");
+  list.className = "hList";
+
+  hist.slice().reverse().forEach((r, idxRev) => {
+    const idx = hist.length - 1 - idxRev;
+    const item = document.createElement("div");
+    item.className = "hItem " + (r.x === "B" ? "b" : r.x === "P" ? "p" : "t");
+    item.innerHTML = `<b>${r.x}</b> <span>${new Date(r.t).toLocaleTimeString()}</span>`;
+    item.onclick = () => {
+      if (!confirm(`Xoá ván #${idx+1} (${r.x}) ?`)) return;
+      state.history.splice(idx, 1);
+      save();
+      render();
+    };
+    list.appendChild(item);
+  });
+
+  root.appendChild(list);
+}
+
+/* ---------- Stats panel ---------- */
+function renderStats(hist) {
+  const bp = onlyBP(hist);
+  const hist20 = lastN(hist, 20);
+  const bp20 = onlyBP(hist20);
+
+  const b = bp.filter(x => x === "B").length;
+  const p = bp.filter(x => x === "P").length;
+  const t = hist.filter(r => r.x === "T").length;
+
+  const altAll = alternationRate(bp);
+  const alt20 = alternationRate(bp20);
+  const tieAll = tieRate(hist);
+  const tie20 = tieRate(hist20);
+  const ent20 = entropyBP(bp20);
+
+  const m = markov(bp20);
+
+  const cards = [
+    ["Tổng ván", String(hist.length)],
+    ["B / P / T", `${b} / ${p} / ${t}`],
+    ["Alt rate (all B/P)", `${Math.round(altAll*100)}%`],
+    ["Alt rate (last 20)", `${Math.round(alt20*100)}%`],
+    ["Tie rate (all)", `${Math.round(tieAll*100)}%`],
+    ["Tie rate (last 20)", `${Math.round(tie20*100)}%`],
+    ["Entropy B/P (last 20)", `${Math.round(ent20*100)}%`],
+    ["Markov BB/BP/PB/PP", `${m.BB||0}/${m.BP||0}/${m.PB||0}/${m.PP||0}`],
+  ];
+
+  const grid = $("statsGrid");
+  grid.innerHTML = "";
+  for (const [k,v] of cards) {
+    const el = document.createElement("div");
+    el.className = "statCard";
+    el.innerHTML = `<div class="k">${k}</div><div class="v">${v}</div>`;
+    grid.appendChild(el);
+  }
+
+  $("markov").textContent = markovText(m);
+}
+
+/* ---------- Main render ---------- */
+function render() {
+  // counts
+  const bCount = state.history.filter(r => r.x === "B").length;
+  const pCount = state.history.filter(r => r.x === "P").length;
+  const tCount = state.history.filter(r => r.x === "T").length;
+
+  $("bCount").textContent = bCount;
+  $("pCount").textContent = pCount;
+  $("tCount").textContent = tCount;
+  $("total").textContent = state.history.length;
+
+  // streak
+  const bp = onlyBP(state.history);
+  const { now, max } = streakInfo(lastN(bp, 20));
+  $("streakNow").textContent = now;
+  $("streakMax").textContent = max ? String(max) : "-";
+
+  // last20 quick
+  const hist20 = lastN(state.history, 20);
+  const alt20 = alternationRate(onlyBP(hist20));
+  const tie20 = tieRate(hist20);
+  $("alt20").textContent = state.history.length < 2 ? "-" : `${Math.round(alt20*100)}%`;
+  $("tie20").textContent = state.history.length < 1 ? "-" : `${Math.round(tie20*100)}%`;
+
+  // score
+  const s = scoreEngine(state.history);
+  $("score").textContent = s.score;
+  $("tag").textContent = s.tag;
+  $("explain").textContent = s.explain;
+  $("warn").textContent = s.warn;
+
+  // roads
+  renderBead(state.history);
+  const big = buildBigRoad(state.history);
+  renderBigRoad(big);
+
+  // history & stats
+  renderHistory(state.history);
+  renderStats(state.history);
+
+  // note
+  $("note").value = state.note || "";
+}
+
+/* ---------- Tabs ---------- */
+function setupTabs() {
+  document.querySelectorAll(".tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+      document.querySelectorAll(".tabBody").forEach(x => x.classList.remove("active"));
+      btn.classList.add("active");
+      const name = btn.getAttribute("data-tab");
+      $("tab-" + name).classList.add("active");
+    });
+  });
+}
+
+/* ---------- Wire UI ---------- */
+function boot() {
+  $("btnB").onclick = () => addResult("B");
+  $("btnP").onclick = () => addResult("P");
+  $("btnT").onclick = () => addResult("T");
+  $("btnU").onclick = () => undo();
+  $("btnR").onclick = () => resetAll();
+  $("btnNewShoe").onclick = () => newShoe();
+  $("btnExport").onclick = () => exportJSON();
+  $("btnClearLS").onclick = () => clearLocal();
+
+  $("fileImport").addEventListener("change", (e) => {
+    const f = e.target.files?.[0];
+    if (f) importJSON(f);
+    e.target.value = "";
+  });
+
+  $("note").addEventListener("input", (e) => {
+    state.note = e.target.value;
+    save();
+  });
+
+  // keyboard shortcuts (PC)
+  window.addEventListener("keydown", (e) => {
+    if (e.target && (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT")) return;
+    const k = e.key.toLowerCase();
+    if (k === "b") addResult("B");
+    if (k === "p") addResult("P");
+    if (k === "t") addResult("T");
+    if (k === "z") undo();
+  });
+
+  setupTabs();
+  render();
+}
+boot();
