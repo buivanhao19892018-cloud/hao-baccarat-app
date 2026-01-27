@@ -1,12 +1,9 @@
 {
-  "name": "Bùi Hào — Baccarat ULTRA PRO",
-  "short_name": "Hào Baccarat",
-  "start_url": "./index.html?v=4",
+  "name": "Bùi Hào – Baccarat ULTRA AI V3",
+  "short_name": "Baccarat V3",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
-  "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
-  ]
+  "icons": []
 }
