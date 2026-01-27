@@ -1,26 +1,45 @@
-const CACHE = "hao-ultra-v4-" + "2026-01-27";
+const CACHE_NAME = "hao-ultra-ai-v3_001";
 const ASSETS = [
   "./",
-  "./index.html?v=4",
-  "./styles.css?v=4",
-  "./app.js?v=4",
-  "./manifest.webmanifest?v=4"
+  "./index.html",
+  "./styles.css",
+  "./app.js",
+  "./manifest.webmanifest"
 ];
 
-self.addEventListener("install", (e)=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));
+self.addEventListener("install", (event) => {
   self.skipWaiting();
-});
-
-self.addEventListener("activate", (e)=>{
-  e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.map(k => k!==CACHE ? caches.delete(k) : null)))
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
-  self.clients.claim();
 });
 
-self.addEventListener("fetch", (e)=>{
-  e.respondWith(
-    caches.match(e.request).then(res => res || fetch(e.request))
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : null)));
+      await self.clients.claim();
+    })()
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  event.respondWith(
+    (async () => {
+      const req = event.request;
+      const url = new URL(req.url);
+
+      // Only same-origin cache
+      if (url.origin !== location.origin) return fetch(req);
+
+      const cached = await caches.match(req);
+      if (cached) return cached;
+
+      const res = await fetch(req);
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(req, res.clone());
+      return res;
+    })()
   );
 });
