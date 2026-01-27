@@ -1,554 +1,533 @@
-const KEY = "hao_baccarat_c6_percent_last20_v1";
+/* ULTRA PRO v4 — Analytics Engine (descriptive, no betting promises) */
 
-let history = load() || []; // {x:'B'|'P'|'T', t:number}
-
-function save() {
-  localStorage.setItem(KEY, JSON.stringify(history));
-}
-function load() {
-  try { return JSON.parse(localStorage.getItem(KEY) || "[]"); }
-  catch { return []; }
-}
-
-function lastN(arr, n) {
-  return arr.slice(Math.max(0, arr.length - n));
-}
-function pct(n, d) {
-  if (!d) return "-";
-  return (n * 100 / d).toFixed(0) + "%";
-}
-function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
-
-function addResult(x) {
-  if (!['B','P','T'].includes(x)) return;
-  history.push({ x, t: Date.now() });
-  save();
-  render();
-}
-function undo() {
-  history.pop();
-  save();
-  render();
-}
-function resetAll() {
-  if (!confirm("Reset toàn bộ lịch sử?")) return;
-  history = [];
-  save();
-  render();
-}
-
-/** ======= ANALYTICS: “AI đứng giữa đưa %” (Last 20) ======= **/
-
-function count(arr) {
-  let B=0,P=0,T=0;
-  for (const it of arr) {
-    if (it.x === 'B') B++;
-    else if (it.x === 'P') P++;
-    else if (it.x === 'T') T++;
-  }
-  return {B,P,T,total:arr.length, bpTotal:B+P};
-}
-
-function bpSeq(arr) {
-  return arr.filter(it => it.x==='B' || it.x==='P').map(it => it.x);
-}
-
-function alternationRate(bp) {
-  if (bp.length < 2) return 0;
-  let alt = 0;
-  for (let i=1;i<bp.length;i++) if (bp[i] !== bp[i-1]) alt++;
-  return alt / (bp.length - 1); // 0..1
-}
-
-function entropyBP(bp) {
-  // Shannon entropy, max 1 when 50/50
-  if (!bp.length) return 0;
-  const n = bp.length;
-  const b = bp.filter(x=>x==='B').length / n;
-  const p = 1 - b;
-  const H = (q)=> (q<=0 ? 0 : -q*Math.log2(q));
-  return H(b) + H(p); // 0..1
-}
-
-function streakLen(bp) {
-  if (!bp.length) return 0;
-  let s = 1;
-  for (let i=bp.length-1;i>0;i--) {
-    if (bp[i] === bp[i-1]) s++;
-    else break;
-  }
-  return s;
-}
-
-function computeLast20() {
-  const h20 = lastN(history, 20);
-  const c20 = count(h20);
-  const bp20 = bpSeq(h20);
-
-  // % theo B/P (bỏ tie)
-  const bPct = c20.bpTotal ? (c20.B * 100 / c20.bpTotal) : 0;
-  const pPct = c20.bpTotal ? (c20.P * 100 / c20.bpTotal) : 0;
-
-  // tie %
-  const tPct = c20.total ? (c20.T * 100 / c20.total) : 0;
-
-  // EDGE = chênh lệch tuyệt đối giữa B% và P% (theo B/P)
-  const edge = Math.abs(bPct - pPct);
-
-  // NOISE: combo (đảo nhịp + entropy cao + tie cao)
-  const alt = alternationRate(bp20);         // 0..1
-  const ent = entropyBP(bp20);               // 0..1 (1 = rất cân bằng)
-  const tie = c20.total ? (c20.T / c20.total) : 0; // 0..1
-
-  // noise scale 0..100
-  let noise = 0;
-  noise += 45 * alt;                         // đảo nhiều => nhiễu
-  noise += 35 * ent;                         // cân 50/50 => nhiễu
-  noise += 20 * Math.min(1, tie/0.25);       // tie >25% => rất nhiễu
-  noise = clamp(Math.round(noise), 0, 100);
-
-  // CONFIDENCE: mạnh khi edge cao và noise thấp, có phạt “streak cuối bệt”
-  const st = streakLen(bp20);                // streak gần nhất
-  let conf = 50;
-  conf += clamp(edge, 0, 30) * 1.2;          // edge tối đa tính 30%
-  conf -= noise * 0.8;                       // noise kéo xuống mạnh
-  if (st >= 6) conf -= 10;                   // cuối bệt -> rủi ro đảo
-  if (c20.total < 12) conf -= 8;             // dữ liệu ít
-  conf = clamp(Math.round(conf), 0, 100);
-
-  return { c20, bPct, pPct, tPct, edge, noise, conf, alt, ent, st };// Hào Baccarat — B (Rhythm Engine PRO)
-// Ghi lịch sử + đọc nhịp (Last20 / Entropy / Noise / Phase)
-// localStorage + Export/Import
-// (Tool quan sát, không phải "dự đoán chắc")
-
-const KEY = "hao_baccarat_B_v1";
+const KEY = "hao_baccarat_ultra_v4";
 
 const $ = (id) => document.getElementById(id);
 
-const state = loadState() ?? {
-  shoeId: 1,
-  results: [],        // 'B' | 'P' | 'T'
-  journal: ""
-};
+let state = loadState();
 
-bindUI();
-renderAll();
+function nowTs(){ return new Date().toISOString(); }
 
-// ---------- UI bindings ----------
-function bindUI(){
-  $("btnB").addEventListener("click", () => add("B"));
-  $("btnP").addEventListener("click", () => add("P"));
-  $("btnT").addEventListener("click", () => add("T"));
-  $("btnU").addEventListener("click", undo);
-  $("btnR").addEventListener("click", resetAll);
-  $("btnNew").addEventListener("click", newShoe);
-
-  $("btnExport").addEventListener("click", doExport);
-  $("fileImport").addEventListener("change", doImport);
-  $("btnClear").addEventListener("click", clearStorage);
-
-  $("historyLimit").addEventListener("change", renderHistory);
-
-  $("journal").addEventListener("input", (e) => {
-    state.journal = e.target.value || "";
-    saveState();
-  });
-
-  // Tabs
-  document.querySelectorAll(".tab").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
-      btn.classList.add("active");
-      const t = btn.dataset.tab;
-      ["history","notes","help"].forEach(name => {
-        $("tab-" + name).classList.toggle("hide", name !== t);
-      });
-    });
-  });
-
-  // Keyboard (PC)
-  window.addEventListener("keydown", (e) => {
-    const k = (e.key || "").toLowerCase();
-    if (k === "b") add("B");
-    if (k === "p") add("P");
-    if (k === "t") add("T");
-    if (k === "z") undo();
-  });
-}
-
-// ---------- Core actions ----------
-function add(x){
-  state.results.push(x);
-  saveState();
-  renderAll();
-}
-
-function undo(){
-  if (!state.results.length) return;
-  state.results.pop();
-  saveState();
-  renderAll();
-}
-
-function resetAll(){
-  if (!confirm("Reset toàn bộ ván trong shoe hiện tại?")) return;
-  state.results = [];
-  saveState();
-  renderAll();
-}
-
-function newShoe(){
-  if (state.results.length && !confirm("Tạo shoe mới? (Shoe hiện tại sẽ được reset)")) return;
-  state.shoeId = (state.shoeId || 1) + 1;
-  state.results = [];
-  saveState();
-  renderAll();
-}
-
-// ---------- Metrics ----------
-function counts(arr){
-  let b=0,p=0,t=0;
-  for (const x of arr){
-    if (x==="B") b++;
-    else if (x==="P") p++;
-    else if (x==="T") t++;
-  }
-  return {b,p,t,total:arr.length};
-}
-
-function bpOnly(arr){
-  return arr.filter(x => x==="B" || x==="P");
-}
-
-function lastN(arr, n){
-  return arr.slice(Math.max(0, arr.length - n));
-}
-
-function pct(num, den){
-  if (!den) return 0;
-  return Math.round((num/den)*100);
-}
-
-function entropyBP(bpArr){
-  // Normalized entropy of B/P distribution: 0..1 => 0..100%
-  // H = -sum p log2 p, max=1 when p=0.5
-  const c = counts(bpArr);
-  const n = c.b + c.p;
-  if (n <= 0) return 0;
-  const pB = c.b / n;
-  const pP = c.p / n;
-  let H = 0;
-  if (pB > 0) H += -pB * Math.log2(pB);
-  if (pP > 0) H += -pP * Math.log2(pP);
-  // max is 1 for 2 outcomes
-  return Math.round((H / 1) * 100);
-}
-
-function alternationRate(bpArr){
-  // % đổi nhịp trong chuỗi B/P (0..100)
-  if (bpArr.length <= 1) return 0;
-  let changes = 0;
-  for (let i=1;i<bpArr.length;i++){
-    if (bpArr[i] !== bpArr[i-1]) changes++;
-  }
-  return Math.round((changes / (bpArr.length - 1)) * 100);
-}
-
-function streakInfo(bpArr){
-  // current streak and longest streak in B/P
-  if (!bpArr.length) return {curSide:"-",curLen:0,longSide:"-",longLen:0};
-
-  // current
-  let curSide = bpArr[bpArr.length-1];
-  let curLen = 1;
-  for (let i=bpArr.length-2;i>=0;i--){
-    if (bpArr[i] === curSide) curLen++;
-    else break;
-  }
-
-  // longest
-  let longLen = 1, longSide = bpArr[0];
-  let runLen = 1, runSide = bpArr[0];
-  for (let i=1;i<bpArr.length;i++){
-    if (bpArr[i] === runSide) runLen++;
-    else {
-      if (runLen > longLen){ longLen = runLen; longSide = runSide; }
-      runSide = bpArr[i];
-      runLen = 1;
-    }
-  }
-  if (runLen > longLen){ longLen = runLen; longSide = runSide; }
-
-  return {curSide,curLen,longSide,longLen};
-}
-
-function noiseScore({entropy, alt, tieRate, sampleBP}){
-  // 0..100 : entropy high + alt high + tie high => noisy
-  // sample small => add noise penalty
-  let n = 0;
-  n += entropy * 0.45;
-  n += alt * 0.40;
-  n += tieRate * 0.15;
-
-  // small sample penalty (bp < 8 is shaky)
-  if (sampleBP < 8) n += (8 - sampleBP) * 6;
-
-  return clamp(Math.round(n), 0, 100);
-}
-
-function confidenceScore({noise, sampleBP}){
-  // 0..100 : inverse of noise, plus maturity bonus by sample size
-  let c = 100 - noise;
-
-  // maturity bonus (bp grows => confidence stabilizes)
-  if (sampleBP >= 8) c += 4;
-  if (sampleBP >= 12) c += 6;
-  if (sampleBP >= 20) c += 8;
-
-  return clamp(Math.round(c), 0, 100);
-}
-
-function phaseDetect({sampleBP, noise, alt, curStreakLen, entropy}){
-  if (sampleBP < 8) return {phase:"DỮ LIỆU ÍT", hint:"Nhập thêm 8–12 ván B/P để đọc nhịp rõ hơn."};
-
-  if (noise >= 70) return {phase:"NHIỄU / TRAP", hint:"Noise cao. Ưu tiên quan sát, tránh “đuổi nhịp”."};
-
-  if (curStreakLen >= 4 && alt <= 45 && entropy <= 60){
-    return {phase:"TREND (BÁM)", hint:"Có streak + alt thấp. Nhịp đang bám, nhưng vẫn canh gãy nhịp."};
-  }
-
-  if (alt >= 65 && entropy >= 70){
-    return {phase:"CHOPPY (ĐẢO)", hint:"Đổi nhịp nhiều + entropy cao. Đừng ép theo 1 phía."};
-  }
-
-  return {phase:"TRUNG TÍNH", hint:"Nhịp vừa phải. Chờ thêm 1–2 ván để xác nhận."};
-}
-
-function clamp(x, a, b){ return Math.max(a, Math.min(b, x)); }
-
-// ---------- Render ----------
-function renderAll(){
-  $("shoeId").textContent = String(state.shoeId || 1);
-  $("journal").value = state.journal || "";
-
-  const c = counts(state.results);
-  $("bCount").textContent = c.b;
-  $("pCount").textContent = c.p;
-  $("tCount").textContent = c.t;
-  $("total").textContent  = c.total;
-
-  // overall % (including ties)
-  $("bPct").textContent = pct(c.b, c.total) + "%";
-  $("pPct").textContent = pct(c.p, c.total) + "%";
-  $("tPct").textContent = pct(c.t, c.total) + "%";
-
-  // BP-only %
-  const bp = bpOnly(state.results);
-  const cbp = counts(bp);
-  $("bpTotal").textContent = cbp.total;
-  $("bpPct").textContent = `B ${pct(cbp.b, cbp.total)}% · P ${pct(cbp.p, cbp.total)}%`;
-
-  // Last 20 window (based on full results)
-  const last20 = lastN(state.results, 20);
-  const last20bp = bpOnly(last20);
-  const last20c = counts(last20bp);
-
-  const alt = alternationRate(last20bp);
-  const tie20 = counts(last20).t;
-  const tieRate20 = pct(tie20, last20.length);
-
-  $("last20Line").textContent =
-    last20bp.length
-      ? `B:${last20c.b} • P:${last20c.p} • Tổng:${last20bp.length}`
-      : "-";
-
-  $("last20Meta").textContent =
-    `B:${last20c.b} · P:${last20c.p} · Alt:${alt}% · Tie(20):${tieRate20}%`;
-
-  // Streak info (on bpOnly overall)
-  const si = streakInfo(bp);
-  $("streakLine").textContent =
-    si.curLen ? `${si.curSide} x${si.curLen}` : "-";
-  $("longestLine").textContent =
-    si.longLen ? `Longest: ${si.longSide} x${si.longLen}` : "Longest: -";
-
-  // Entropy / Noise (use last20bp for short-term rhythm)
-  const ent = entropyBP(last20bp);
-  $("entropy").textContent = ent + "%";
-  $("entropyBar").style.width = ent + "%";
-
-  const noise = noiseScore({
-    entropy: ent,
-    alt,
-    tieRate: tieRate20,
-    sampleBP: last20bp.length
-  });
-  $("noise").textContent = noise + "%";
-  $("noiseBar").style.width = noise + "%";
-
-  // Confidence + phase
-  const conf = confidenceScore({noise, sampleBP: last20bp.length});
-  $("confidence").textContent = conf;
-
-  const ph = phaseDetect({
-    sampleBP: last20bp.length,
-    noise,
-    alt,
-    curStreakLen: streakInfo(last20bp).curLen,
-    entropy: ent
-  });
-
-  $("phaseBadge").textContent = ph.phase;
-  $("hint").textContent = ph.hint;
-
-  // History
-  renderHistory();
-}
-
-function renderHistory(){
-  const limit = parseInt($("historyLimit").value || "200", 10);
-  const el = $("history");
-  el.innerHTML = "";
-
-  const arr = state.results.slice(-limit).reverse(); // newest first
-  if (!arr.length){
-    el.innerHTML = `<div class="tiny">Chưa có lịch sử. Bấm Banker/Player/Tie để bắt đầu.</div>`;
-    return;
-  }
-
-  arr.forEach((x, idx) => {
-    const realIndex = state.results.length - 1 - idx; // index in original array
-    const pill = document.createElement("div");
-    pill.className = "pill";
-    const dot = document.createElement("span");
-    dot.className = "dot " + (x==="B"?"b":x==="P"?"p":"t");
-    const txt = document.createElement("b");
-    txt.textContent = x;
-    const sm = document.createElement("small");
-    sm.textContent = `#${realIndex+1}`;
-
-    pill.appendChild(dot);
-    pill.appendChild(txt);
-    pill.appendChild(sm);
-
-    pill.addEventListener("click", () => {
-      if (!confirm(`Xóa ván #${realIndex+1} (${x})?`)) return;
-      state.results.splice(realIndex, 1);
-      saveState();
-      renderAll();
-    });
-
-    el.appendChild(pill);
-  });
-}
-
-// ---------- Storage / Export / Import ----------
-function saveState(){
-  localStorage.setItem(KEY, JSON.stringify(state));
+function defaultState(){
+  return {
+    version: 4,
+    shoe: 1,
+    hands: [] // {r:'B'|'P'|'T', ts, meta:{bp,pp,n8,n9, bcards[], pcards[]}}
+  };
 }
 
 function loadState(){
   try{
     const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
+    if(!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    if(!parsed || !parsed.hands) return defaultState();
+    return parsed;
   }catch(e){
-    return null;
+    return defaultState();
   }
 }
 
-function clearStorage(){
-  if (!confirm("Xóa toàn bộ dữ liệu lưu máy?")) return;
-  localStorage.removeItem(KEY);
-  location.reload();
+function save(){
+  localStorage.setItem(KEY, JSON.stringify(state));
+}
+
+function addResult(r){
+  state.hands.push({ r, ts: nowTs(), shoe: state.shoe, meta:{} });
+  save();
+  renderAll();
+}
+
+function undo(){
+  state.hands.pop();
+  save();
+  renderAll();
+}
+
+function resetShoe(){
+  // reset only current shoe hands?
+  state.hands = [];
+  save();
+  renderAll();
+}
+
+function newShoe(){
+  state.shoe += 1;
+  state.hands.push({ r: "—", ts: nowTs(), shoe: state.shoe, meta:{ marker:true } });
+  // marker just to separate; not counted
+  save();
+  renderAll();
+}
+
+function clearAll(){
+  state = defaultState();
+  save();
+  renderAll();
+}
+
+function getValidHands(){
+  return state.hands.filter(h => h.r === "B" || h.r === "P" || h.r === "T");
+}
+
+function countAll(){
+  const hands = getValidHands();
+  const B = hands.filter(x=>x.r==="B").length;
+  const P = hands.filter(x=>x.r==="P").length;
+  const T = hands.filter(x=>x.r==="T").length;
+  return {B,P,T,total:hands.length};
+}
+
+function sliceLast(n){
+  const hands = getValidHands();
+  return hands.slice(-n);
+}
+
+function pct(x, total){
+  if(!total) return 0;
+  return Math.round((x/total)*100);
+}
+
+function altRate(hands){
+  // alternation on B/P only, ignore T
+  const seq = hands.filter(h => h.r==="B" || h.r==="P").map(h=>h.r);
+  if(seq.length <= 1) return 0;
+  let alt=0;
+  for(let i=1;i<seq.length;i++){
+    if(seq[i] !== seq[i-1]) alt++;
+  }
+  return Math.round((alt/(seq.length-1))*100);
+}
+
+function longestStreak(hands){
+  let best = {r:"", len:0};
+  let cur = {r:"", len:0};
+  for(const h of hands){
+    if(h.r==="T") continue;
+    if(h.r === cur.r){
+      cur.len++;
+    }else{
+      cur = {r:h.r, len:1};
+    }
+    if(cur.len > best.len) best = {...cur};
+  }
+  return best;
+}
+
+function entropyBP(hands){
+  // entropy of B/P distribution (ignore T)
+  const bp = hands.filter(h=>h.r==="B"||h.r==="P");
+  const n = bp.length;
+  if(n===0) return 0;
+  const b = bp.filter(h=>h.r==="B").length;
+  const p = n-b;
+  const pb = b/n, pp = p/n;
+  const H = (x)=> x<=0 ? 0 : -x*Math.log2(x);
+  const ent = H(pb)+H(pp); // 0..1
+  return ent; // 0 pure, 1 max
+}
+
+function biasLastN(hands){
+  // bias toward B or P in last N (ignore T) as absolute diff %
+  const bp = hands.filter(h=>h.r==="B"||h.r==="P");
+  const n = bp.length;
+  if(n===0) return {lean:"NONE", bias:0, b:0, p:0, n:0};
+  const b = bp.filter(h=>h.r==="B").length;
+  const p = n-b;
+  const d = b-p;
+  const bias = Math.round((Math.abs(d)/n)*100);
+  const lean = d>0 ? "BANKER" : d<0 ? "PLAYER" : "NONE";
+  return {lean, bias, b, p, n};
+}
+
+function noiseIndex(hands){
+  // simple noise: high alternation + high entropy => noisy
+  const ent = entropyBP(hands);      // 0..1
+  const alt = altRate(hands)/100;    // 0..1
+  const noise = Math.round(((ent*0.6 + alt*0.4) * 100));
+  return {noise, ent: Math.round(ent*100), alt: Math.round(alt*100)};
+}
+
+function confidenceIndex(last30){
+  // confidence: inverse of noise, plus bias presence
+  const n = noiseIndex(last30).noise; // 0..100
+  const b = biasLastN(last30).bias;   // 0..100
+  const conf = Math.max(0, Math.min(100, Math.round((100 - n)*0.7 + b*0.3)));
+  return conf;
+}
+
+function aiEngine(){
+  const last12 = sliceLast(12);
+  const last30 = sliceLast(30);
+
+  const total = getValidHands().length;
+
+  if(total < 6){
+    return {state:"WAIT", explain:"Chưa đủ dữ liệu → ưu tiên quan sát." , conf:0, ent:0, bias:0, noise:0, alt:0};
+  }
+
+  const b30 = biasLastN(last30);
+  const nz = noiseIndex(last30);
+  const conf = confidenceIndex(last30);
+
+  // state (descriptive)
+  let st = "WAIT";
+  let explain = "Mẫu chưa rõ hoặc nhiễu cao → quan sát thêm.";
+
+  if(nz.noise <= 45 && conf >= 55 && b30.bias >= 18){
+    st = `LEAN ${b30.lean}`;
+    explain = `Last30 lệch về ${b30.lean} (${b30.b}-${b30.p}), nhiễu thấp hơn.`;
+  } else if(nz.noise >= 65){
+    st = "NOISY";
+    explain = "Nhiễu cao (đảo nhiều/entropy cao) → dễ lạc nhịp.";
+  } else if(b30.bias <= 10){
+    st = "BALANCED";
+    explain = "Cân tương đối → chưa có lệch rõ.";
+  }
+
+  return {
+    state: st,
+    explain,
+    conf,
+    ent: nz.ent,
+    bias: b30.bias,
+    noise: nz.noise,
+    alt: nz.alt
+  };
+}
+
+function parseCards(s){
+  // accept "9,0,6" or "9 0 6"
+  if(!s) return [];
+  return s
+    .split(/[, ]+/)
+    .map(x=>x.trim())
+    .filter(Boolean)
+    .map(x=>{
+      // allow A as 1? baccarat: A=1, 0=0, 10/J/Q/K=0 (optional)
+      const u = x.toUpperCase();
+      if(u==="A") return 1;
+      if(u==="J"||u==="Q"||u==="K"||u==="10") return 0;
+      const n = parseInt(u,10);
+      if(Number.isNaN(n)) return null;
+      // baccarat value: 0-9, 10.. treated as 0
+      if(n>=10) return 0;
+      if(n<0) return null;
+      return n;
+    })
+    .filter(x=>x!==null);
+}
+
+function baccaratPoint(cards){
+  const sum = cards.reduce((a,b)=>a+b,0);
+  return sum % 10;
+}
+
+function autoFlagsFromCards(bcards, pcards){
+  // pair detection requires knowing first two cards ranks; we only have values. We'll treat "pair" only if user ticks.
+  // Natural: if two cards total 8 or 9
+  const b2 = bcards.slice(0,2);
+  const p2 = pcards.slice(0,2);
+  const bp = b2.length===2 ? baccaratPoint(b2) : null;
+  const pp = p2.length===2 ? baccaratPoint(p2) : null;
+  return {
+    n8: (bp===8 || pp===8),
+    n9: (bp===9 || pp===9),
+    bPoint: bcCardsOk(bcards) ? baccaratPoint(bcards) : null,
+    pPoint: bcCardsOk(pcards) ? baccaratPoint(pcards) : null
+  };
+}
+
+function bcCardsOk(arr){ return Array.isArray(arr) && arr.length>=2; }
+
+function attachDetailsToLast(){
+  const hands = getValidHands();
+  if(hands.length===0){
+    alert("Chưa có ván nào để gắn chi tiết.");
+    return;
+  }
+  const idx = state.hands.map((h,i)=>({h,i})).filter(x=>x.h.r==="B"||x.h.r==="P"||x.h.r==="T").slice(-1)[0].i;
+
+  const bp = $("xBP").checked;
+  const pp = $("xPP").checked;
+  const n8 = $("xN8").checked;
+  const n9 = $("xN9").checked;
+  const bc = parseCards($("inBcards").value);
+  const pc = parseCards($("inPcards").value);
+
+  const auto = autoFlagsFromCards(bc, pc);
+
+  state.hands[idx].meta = {
+    bp, pp,
+    n8: n8 || auto.n8,
+    n9: n9 || auto.n9,
+    bc, pc,
+    bPoint: auto.bPoint,
+    pPoint: auto.pPoint
+  };
+
+  save();
+  renderAll();
+}
+
+function clearDetailInputs(){
+  $("xBP").checked=false;
+  $("xPP").checked=false;
+  $("xN8").checked=false;
+  $("xN9").checked=false;
+  $("inBcards").value="";
+  $("inPcards").value="";
+}
+
+function renderHeaderStats(){
+  const c = countAll();
+  $("sB").innerText = c.B;
+  $("sP").innerText = c.P;
+  $("sT").innerText = c.T;
+  $("sTotal").innerText = c.total;
+}
+
+function setBar(idFill, idVal, v){
+  const vv = Math.max(0, Math.min(100, v));
+  $(idFill).style.width = vv + "%";
+  $(idVal).innerText = vv + "%";
+}
+
+function renderAI(){
+  const ai = aiEngine();
+  $("aiState").innerText = ai.state;
+  $("aiExplain").innerText = ai.explain;
+
+  $("mBias").innerText = ai.bias + "%";
+  $("mNoise").innerText = ai.noise + "%";
+  $("mAlt").innerText = ai.alt + "%";
+
+  setBar("barConf","barConfVal", ai.conf);
+  setBar("barEnt","barEntVal", ai.ent);
+}
+
+function renderBead(){
+  const hands = getValidHands();
+  const pane = $("pane-bead");
+  const max = 12*6; // 72
+  const last = hands.slice(-max);
+
+  const grid = document.createElement("div");
+  grid.className = "road beadGrid road";
+
+  for(let i=0;i<max;i++){
+    const d = document.createElement("div");
+    d.className = "dot empty";
+    const h = last[i];
+    if(h){
+      if(h.r==="B") d.className = "dot b";
+      if(h.r==="P") d.className = "dot p";
+      if(h.r==="T") d.className = "dot t";
+    }
+    grid.appendChild(d);
+  }
+  pane.innerHTML = "";
+  pane.appendChild(grid);
+}
+
+function buildBigRoadCols(hands){
+  // Simple Big Road: columns of streaks for B/P; T ignored in placement (counted separately in history)
+  const seq = hands.filter(h=>h.r==="B"||h.r==="P").map(h=>h.r);
+  const cols = [];
+  let curCol = [];
+  let cur = null;
+  for(const r of seq){
+    if(r===cur){
+      curCol.push(r);
+    }else{
+      if(curCol.length) cols.push(curCol);
+      cur = r;
+      curCol = [r];
+    }
+  }
+  if(curCol.length) cols.push(curCol);
+  return cols;
+}
+
+function renderBigRoad(){
+  const hands = getValidHands();
+  const pane = $("pane-big");
+  const cols = buildBigRoadCols(hands);
+
+  const maxCols = 20;
+  const rows = 6;
+
+  const grid = document.createElement("div");
+  grid.className = "road bigGrid road";
+
+  // draw column-major into a 20x6 grid
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<maxCols;c++){
+      const d = document.createElement("div");
+      d.className = "dot empty";
+      const col = cols[c];
+      if(col && col[r]){
+        d.className = col[r]==="B" ? "dot b" : "dot p";
+      }
+      grid.appendChild(d);
+    }
+  }
+
+  pane.innerHTML = "";
+  pane.appendChild(grid);
+}
+
+function renderHistory(){
+  const hands = getValidHands();
+  const pane = $("pane-list");
+  pane.innerHTML = "";
+
+  const wrap = document.createElement("div");
+
+  for(let i=hands.length-1;i>=0;i--){
+    const h = hands[i];
+    const item = document.createElement("div");
+    item.className = "histItem";
+
+    const left = document.createElement("div");
+    const pill = document.createElement("span");
+    pill.className = "pill " + (h.r==="B"?"b":h.r==="P"?"p":"t");
+    pill.textContent = h.r==="B" ? "BANKER" : h.r==="P" ? "PLAYER" : "TIE";
+
+    const meta = h.meta || {};
+    const flags = [];
+    if(meta.bp) flags.push("BP");
+    if(meta.pp) flags.push("PP");
+    if(meta.n8) flags.push("N8");
+    if(meta.n9) flags.push("N9");
+    if(meta.bPoint!=null || meta.pPoint!=null){
+      flags.push(`B${meta.bPoint ?? "?"}-P${meta.pPoint ?? "?"}`);
+    }
+
+    left.appendChild(pill);
+    if(flags.length){
+      const f = document.createElement("span");
+      f.className = "pill g";
+      f.style.marginLeft = "8px";
+      f.textContent = flags.join(" • ");
+      left.appendChild(f);
+    }
+
+    const right = document.createElement("div");
+    right.style.color = "#666";
+    right.style.fontWeight = "900";
+    right.style.fontSize = "12px";
+    right.textContent = new Date(h.ts).toLocaleString();
+
+    item.appendChild(left);
+    item.appendChild(right);
+    wrap.appendChild(item);
+  }
+
+  pane.appendChild(wrap);
+}
+
+function renderDumpText(text){
+  $("dump").value = text || "";
 }
 
 function doExport(){
-  const payload = {
-    version: "B_v1",
-    exportedAt: new Date().toISOString(),
-    data: state
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+  const txt = JSON.stringify(state, null, 2);
+  renderDumpText(txt);
+  const blob = new Blob([txt], {type:"application/json"});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `hao-baccarat_B_export_shoe${state.shoeId}.json`;
+  a.download = "hao-baccarat-ultra-v4.json";
   a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 500);
+  URL.revokeObjectURL(a.href);
 }
 
-function doImport(e){
-  const f = e.target.files?.[0];
-  if (!f) return;
+async function doCopy(){
+  const txt = JSON.stringify(state, null, 2);
+  renderDumpText(txt);
+  try{
+    await navigator.clipboard.writeText(txt);
+    alert("Đã copy JSON.");
+  }catch(e){
+    alert("Không copy được. Bạn copy thủ công trong ô JSON.");
+  }
+}
+
+function doImportFile(file){
   const reader = new FileReader();
   reader.onload = () => {
     try{
-      const json = JSON.parse(String(reader.result || "{}"));
-      const d = json.data || json;
-      if (!d || !Array.isArray(d.results)) throw new Error("Sai định dạng");
-      if (!confirm("Import sẽ ghi đè dữ liệu hiện tại. Tiếp tục?")) return;
-      state.shoeId = d.shoeId || 1;
-      state.results = d.results || [];
-      state.journal = d.journal || "";
-      saveState();
+      const obj = JSON.parse(reader.result);
+      if(!obj || !obj.hands) throw new Error("bad");
+      state = obj;
+      save();
       renderAll();
-    }catch(err){
-      alert("Import lỗi: " + err.message);
-    }finally{
-      e.target.value = "";
+      alert("Import OK.");
+    }catch(e){
+      alert("File JSON không hợp lệ.");
     }
   };
-  reader.readAsText(f);
-}
-}
-
-/** ======= UI ======= **/
-
-function setText(id, v) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = v;
+  reader.readAsText(file);
 }
 
-function render() {
-  const c = count(history);
-  setText("bCount", c.B);
-  setText("pCount", c.P);
-  setText("tCount", c.T);
-  setText("total", c.total);
-
-  const m = computeLast20();
-
-  // hiển thị %
-  setText("bpB20", c.total ? (m.c20.bpTotal ? `${m.bPct.toFixed(0)}%` : "-") : "-");
-  setText("bpP20", c.total ? (m.c20.bpTotal ? `${m.pPct.toFixed(0)}%` : "-") : "-");
-  setText("t20",  c.total ? `${m.tPct.toFixed(0)}%` : "-");
-
-  // EDGE + NOISE
-  if (m.c20.bpTotal) {
-    const winner = m.bPct >= m.pPct ? "B" : "P";
-    setText("edge20", `${winner} +${m.edge.toFixed(0)}%`);
-  } else {
-    setText("edge20", "-");
-  }
-  setText("noise20", `${m.noise}%`);
-
-  // CONFIDENCE
-  setText("conf", c.total ? String(m.conf) : "--");
-
-  // giải thích ngắn, không phán kèo
-  const explainEl = document.getElementById("explain20");
-  if (explainEl) {
-    if (history.length < 6) {
-      explainEl.textContent = "Dữ liệu ít → ưu tiên quan sát thêm. (Tính theo 20 ván gần nhất)";
-    } else {
-      explainEl.textContent =
-        `Last20: B=${m.c20.B}, P=${m.c20.P}, T=${m.c20.T} • Alt=${Math.round(m.alt*100)}% • Entropy=${m.ent.toFixed(2)} • Streak=${m.st} • Confidence=${m.conf}/100`;
-    }
-  }
+function setTab(tab){
+  document.querySelectorAll(".tab").forEach(t => {
+    t.classList.toggle("on", t.dataset.tab===tab);
+  });
+  ["bead","big","list"].forEach(k=>{
+    $("pane-"+k).classList.toggle("hidden", k!==tab);
+  });
 }
 
-window.addResult = addResult;
-window.undo = undo;
-window.resetAll = resetAll;
+function renderAll(){
+  renderHeaderStats();
+  renderAI();
+  renderBead();
+  renderBigRoad();
+  renderHistory();
+}
 
-render();
+function bind(){
+  $("btnB").onclick = ()=>addResult("B");
+  $("btnP").onclick = ()=>addResult("P");
+  $("btnT").onclick = ()=>addResult("T");
+
+  $("btnUndo").onclick = undo;
+  $("btnReset").onclick = ()=>{ if(confirm("Reset ván của shoe hiện tại?")) resetShoe(); };
+  $("btnNewShoe").onclick = ()=>{ if(confirm("Tạo shoe mới?")) newShoe(); };
+
+  $("btnAttach").onclick = attachDetailsToLast;
+  $("btnClearDetail").onclick = clearDetailInputs;
+
+  $("btnExport").onclick = doExport;
+  $("btnCopy").onclick = doCopy;
+
+  $("fileImport").addEventListener("change", (e)=>{
+    const f = e.target.files?.[0];
+    if(f) doImportFile(f);
+    e.target.value = "";
+  });
+
+  $("btnClearAll").onclick = ()=>{ if(confirm("Xóa toàn bộ dữ liệu?")) clearAll(); };
+
+  document.querySelectorAll(".tab").forEach(t=>{
+    t.onclick = ()=>setTab(t.dataset.tab);
+  });
+
+  // PWA install
+  let deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", (e)=>{
+    e.preventDefault();
+    deferredPrompt = e;
+    $("btnInstall").hidden = false;
+  });
+  $("btnInstall").onclick = async ()=>{
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    $("btnInstall").hidden = true;
+  };
+}
+
+bind();
+renderAll();
