@@ -1,22 +1,26 @@
-const CACHE = "hao-baccarat-c4-v1";
-const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest"];
+const CACHE = "hao-ultra-v4-" + "2026-01-27";
+const ASSETS = [
+  "./",
+  "./index.html?v=4",
+  "./styles.css?v=4",
+  "./app.js?v=4",
+  "./manifest.webmanifest?v=4"
+];
 
-self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
+self.addEventListener("install", (e)=>{
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));
+  self.skipWaiting();
 });
 
-self.addEventListener("activate", (e) => {
+self.addEventListener("activate", (e)=>{
   e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.map(k => (k===CACHE?null:caches.delete(k)))))
+    caches.keys().then(keys => Promise.all(keys.map(k => k!==CACHE ? caches.delete(k) : null)))
   );
+  self.clients.claim();
 });
 
-self.addEventListener("fetch", (e) => {
+self.addEventListener("fetch", (e)=>{
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).then((res)=>{
-      const copy = res.clone();
-      caches.open(CACHE).then((c)=>c.put(e.request, copy)).catch(()=>{});
-      return res;
-    }).catch(()=>hit))
+    caches.match(e.request).then(res => res || fetch(e.request))
   );
 });
