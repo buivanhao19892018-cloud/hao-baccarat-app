@@ -2,192 +2,146 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Bùi Hào – Baccarat ULTRA AI V3</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bùi Hào — Baccarat • ULTRA AI V3 • WHITE PRO</title>
   <meta name="theme-color" content="#ffffff" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=3.0.0" />
 </head>
 <body>
-  <header class="top">
+  <header class="topbar">
     <div class="brand">
-      <div class="title">Bùi Hào – Baccarat</div>
+      <div class="title">Bùi Hào — Baccarat</div>
       <div class="badge">ULTRA AI V3 • WHITE PRO</div>
     </div>
-    <div class="sub">
-      Nhập ván + nhập lá bài. Tự nhận <b>Pair (2 lá đầu)</b> + <b>Long Bảo (Natural 8/9)</b>. Phân tích <b>Last12/30/50</b> + <b>Noise/Phase/Lean</b>.
+    <div class="subtitle">
+      Nhập ván (B/P/T) + (tuỳ chọn) nhập lá bài. AI đọc nhịp theo Last12/30/50 + Noise/Phase/Lean.
     </div>
   </header>
 
   <main class="wrap">
-    <!-- ACTION BUTTONS -->
-    <section class="card">
-      <div class="grid2">
-        <button class="btn btnB" id="btnB">BANKER WIN</button>
-        <button class="btn btnP" id="btnP">PLAYER WIN</button>
-        <button class="btn btnT" id="btnT">TIE</button>
-        <button class="btn btnGray" id="btnUndo">UNDO</button>
-      </div>
-      <div class="grid2">
-        <button class="btn btnDanger" id="btnReset">RESET</button>
-        <button class="btn btnOutline" id="btnNewShoe">NEW SHOE</button>
+    <section class="panel">
+      <div class="btnGrid">
+        <button id="btnB" class="btn btnB">BANKER WIN</button>
+        <button id="btnP" class="btn btnP">PLAYER WIN</button>
+        <button id="btnT" class="btn btnT">TIE</button>
+        <button id="btnU" class="btn btnG">UNDO</button>
+        <button id="btnR" class="btn btnR">RESET</button>
+        <button id="btnN" class="btn btnW">NEW SHOE</button>
       </div>
 
-      <div class="miniRow">
-        <div class="mini"><span class="dot dotB"></span> B: <b id="cntB">0</b></div>
-        <div class="mini"><span class="dot dotP"></span> P: <b id="cntP">0</b></div>
-        <div class="mini"><span class="dot dotT"></span> T: <b id="cntT">0</b></div>
-        <div class="mini">Shoe: <b id="shoeNo">1</b></div>
-        <div class="mini">Total: <b id="totalHands">0</b></div>
+      <div class="statsRow">
+        <div class="pill"><span class="dot dotB"></span><b>B:</b> <span id="sB">0</span></div>
+        <div class="pill"><span class="dot dotP"></span><b>P:</b> <span id="sP">0</span></div>
+        <div class="pill"><span class="dot dotT"></span><b>T:</b> <span id="sT">0</span></div>
+        <div class="pill"><b>Shoe:</b> <span id="sShoe">1</span></div>
+        <div class="pill"><b>Total:</b> <span id="sTotal">0</span></div>
       </div>
     </section>
 
-    <!-- CARD INPUT -->
-    <section class="card">
-      <div class="h">🃏 Nhập lá bài (tuỳ chọn)</div>
-      <div class="muted">Chọn 2–3 lá cho Banker và Player. 10/J/Q/K tính 0. App tự nhận Pair & Long Bảo.</div>
-
-      <div class="cardsGrid">
-        <div class="side">
-          <div class="sideTitle"><span class="dot dotB"></span> Banker</div>
-          <div class="row3">
-            <select class="sel" id="b1"></select>
-            <select class="sel" id="b2"></select>
-            <select class="sel" id="b3"></select>
-          </div>
-          <div class="line">
-            Tổng: <b id="bTotal">0</b> • Pair(2 lá): <b id="bPair">—</b> • Long Bảo: <b id="bNat">—</b>
-          </div>
-        </div>
-
-        <div class="side">
-          <div class="sideTitle"><span class="dot dotP"></span> Player</div>
-          <div class="row3">
-            <select class="sel" id="p1"></select>
-            <select class="sel" id="p2"></select>
-            <select class="sel" id="p3"></select>
-          </div>
-          <div class="line">
-            Tổng: <b id="pTotal">0</b> • Pair(2 lá): <b id="pPair">—</b> • Long Bảo: <b id="pNat">—</b>
-          </div>
-        </div>
+    <section class="panel">
+      <div class="panelHead">
+        <div class="panelTitle">AI STATUS (GOD MODE)</div>
+        <div class="panelNote">AI chỉ giúp lọc nhịp & tránh nhiễu. Không có “chắc thắng”.</div>
       </div>
 
-      <div class="muted small">
-        Gợi ý: nếu không muốn nhập lá, cứ bấm BANKER/PLAYER/TIE bình thường.
-      </div>
-    </section>
+      <div class="aiBig" id="aiDecision">WAIT</div>
 
-    <!-- AI PANEL -->
-    <section class="card">
-      <div class="h">🤖 AI STATUS (QUAN SÁT)</div>
-
-      <div class="aiBig" id="aiAction">WAIT</div>
-
-      <div class="pillRow">
-        <div class="pill">PHASE: <b id="aiPhase">DỮ LIỆU ÍT</b></div>
-        <div class="pill">LEAN: <b id="aiLean">NONE</b></div>
-        <div class="pill">TRAP: <b id="aiTrap">—</b></div>
+      <div class="tagRow">
+        <span class="tag" id="aiPhase">PHASE: DỮ LIỆU ÍT</span>
+        <span class="tag" id="aiLean">LEAN: NONE</span>
+        <span class="tag" id="aiReason">REASON: —</span>
       </div>
 
       <div class="kpiRow">
         <div class="kpi">
-          <div class="kLabel">Confidence</div>
-          <div class="kVal" id="kConf">50%</div>
+          <div class="kpiLabel">Confidence</div>
+          <div class="kpiVal"><span id="kConf">50</span>%</div>
+          <div class="bar"><div id="barConf" class="fill"></div></div>
         </div>
         <div class="kpi">
-          <div class="kLabel">Noise</div>
-          <div class="kVal" id="kNoise">50%</div>
+          <div class="kpiLabel">Noise</div>
+          <div class="kpiVal"><span id="kNoise">50</span>%</div>
+          <div class="bar"><div id="barNoise" class="fill"></div></div>
         </div>
         <div class="kpi">
-          <div class="kLabel">Edge (Obs)</div>
-          <div class="kVal" id="kEdge">0%</div>
+          <div class="kpiLabel">Edge (proxy)</div>
+          <div class="kpiVal"><span id="kEdge">0</span>%</div>
+          <div class="bar"><div id="barEdge" class="fill"></div></div>
         </div>
       </div>
 
-      <div class="barWrap">
-        <div class="barLine"><span>Confidence</span><b id="confTxt">50%</b></div>
-        <div class="bar"><div class="fill" id="confBar"></div></div>
-
-        <div class="barLine"><span>Noise</span><b id="noiseTxt">50%</b></div>
-        <div class="bar"><div class="fill" id="noiseBar"></div></div>
-
-        <div class="barLine"><span>Edge (Obs)</span><b id="edgeTxt">0%</b></div>
-        <div class="bar"><div class="fill" id="edgeBar"></div></div>
-      </div>
-
-      <div class="note" id="aiNote">Chưa đủ dữ liệu. Nhập thêm ván để AI phân tích nhịp.</div>
-    </section>
-
-    <!-- LAST N STATS -->
-    <section class="card">
-      <div class="h">📊 Thống kê nhanh</div>
-
-      <div class="grid3">
-        <div class="statBox">
-          <div class="sTitle">Last 12 (B/P)</div>
-          <div class="sVal" id="last12">—</div>
-        </div>
-        <div class="statBox">
-          <div class="sTitle">Last 30 (B/P)</div>
-          <div class="sVal" id="last30">—</div>
-        </div>
-        <div class="statBox">
-          <div class="sTitle">Last 50 (B/P)</div>
-          <div class="sVal" id="last50">—</div>
-        </div>
-      </div>
-
-      <div class="grid3">
-        <div class="statBox">
-          <div class="sTitle">Alt rate (B↔P)</div>
-          <div class="sVal" id="altRate">—</div>
-        </div>
-        <div class="statBox">
-          <div class="sTitle">Pair rate (2 lá)</div>
-          <div class="sVal" id="pairRate">—</div>
-        </div>
-        <div class="statBox">
-          <div class="sTitle">Natural 8/9 rate</div>
-          <div class="sVal" id="natRate">—</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- TOOLS -->
-    <section class="card">
-      <div class="h">🧰 Công cụ</div>
       <div class="grid2">
-        <button class="btn btnOutline" id="btnExport">EXPORT</button>
-        <button class="btn btnOutline" id="btnImport">IMPORT</button>
+        <div class="box">
+          <div class="boxTitle">Last12 (B/P)</div>
+          <div class="boxText" id="bLast12">—</div>
+        </div>
+        <div class="box">
+          <div class="boxTitle">Last30 (B/P)</div>
+          <div class="boxText" id="bLast30">—</div>
+        </div>
+        <div class="box">
+          <div class="boxTitle">Last50 (B/P)</div>
+          <div class="boxText" id="bLast50">—</div>
+        </div>
+        <div class="box">
+          <div class="boxTitle">Chop / Streak</div>
+          <div class="boxText" id="bChop">—</div>
+        </div>
       </div>
-      <div class="muted small">
-        Nếu bị “vẫn bản cũ”: mở Tab ẩn danh hoặc xóa dữ liệu trang web (do cache SW).
-      </div>
-      <input type="file" id="fileImport" accept="application/json" hidden />
     </section>
 
-    <!-- HISTORY -->
-    <section class="card">
-      <div class="h">🧾 Lịch sử (tap để xoá 1 ván)</div>
-      <div class="histTop">
-        <div class="muted small">Giữ nhẹ: xoá đúng ván đó.</div>
-        <select id="histLimit" class="sel smallSel">
-          <option value="50">Hiện 50</option>
-          <option value="100">Hiện 100</option>
-          <option value="200" selected>Hiện 200</option>
-          <option value="500">Hiện 500</option>
-        </select>
+    <section class="panel">
+      <div class="panelHead">
+        <div class="panelTitle">Nhập lá bài (tuỳ chọn) • Pair + Long Bảo</div>
+        <div class="panelNote">Chọn 2–3 lá. 10/J/Q/K = 0. App tự nhận Pair(2 lá đầu) & Natural 8/9.</div>
+      </div>
+
+      <div class="cardBox">
+        <div class="cardSide">
+          <div class="sideTitle"><span class="dot dotB"></span> Banker</div>
+          <div class="cardRow">
+            <select id="b1" class="sel"></select>
+            <select id="b2" class="sel"></select>
+            <select id="b3" class="sel"></select>
+          </div>
+          <div class="sideFoot" id="bInfo">Tổng: 0 • Pair(2 lá): NO • Long Bảo: NO</div>
+        </div>
+
+        <div class="cardSide">
+          <div class="sideTitle"><span class="dot dotP"></span> Player</div>
+          <div class="cardRow">
+            <select id="p1" class="sel"></select>
+            <select id="p2" class="sel"></select>
+            <select id="p3" class="sel"></select>
+          </div>
+          <div class="sideFoot" id="pInfo">Tổng: 0 • Pair(2 lá): NO • Long Bảo: NO</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panelHead">
+        <div class="panelTitle">Lịch sử (tap để xoá 1 ván)</div>
+        <div class="panelNote">Lưu localStorage. Export/Import sẽ làm ở V4 (nếu bạn muốn).</div>
       </div>
       <div id="history" class="history"></div>
     </section>
-
-    <footer class="foot">
-      <div>ULTRA AI V3 • White Pro • Lưu máy (localStorage) • Offline (SW)</div>
-      <div class="small muted">© Bùi Hào</div>
-    </footer>
   </main>
 
-  <script src="app.js"></script>
+  <footer class="foot">
+    <div>Tip: Khi GitHub Pages “ra bản cũ” → hard refresh + xoá cache/Service Worker.</div>
+    <div class="small">ULTRA AI V3 — build: <span id="build">3.0.0</span></div>
+  </footer>
+
+  <script src="app.js?v=3.0.0"></script>
+  <script>
+    // Register SW (cache ổn + tự update khi đổi phiên bản)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js?v=3.0.0').catch(()=>{});
+      });
+    }
+  </script>
 </body>
 </html>
