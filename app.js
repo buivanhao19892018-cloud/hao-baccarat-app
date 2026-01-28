@@ -1,511 +1,388 @@
-(() => {
-  // ===== VERSION (đổi số này mỗi lần update để dễ biết đã lên bản mới) =====
-  const APP_VERSION = "ULTRA_AI_V3_1.0.0";
+// ULTRA AI V3 • WHITE PRO
+const BUILD = "3.0.0";
+document.getElementById("build").textContent = BUILD;
 
-  // ===== STORAGE =====
-  const KEY = "hao_baccarat_ultra_v3_state";
-  const defaultState = () => ({
-    version: APP_VERSION,
-    shoe: 1,
-    hands: [], // {t, res:'B'|'P'|'T', cards:{b:[..],p:[..]}, flags:{bPair,pPair,bNat,pNat}}
+const LS_KEY = "hao_baccarat_ultra_ai_v3_white_pro";
+
+const state = loadState() || {
+  shoe: 1,
+  seq: [], // 'B' | 'P' | 'T' (T không tính vào B/P core)
+  cards: {
+    b: [null, null, null],
+    p: [null, null, null],
+  }
+};
+
+const $ = (id)=>document.getElementById(id);
+
+// Buttons
+$("btnB").onclick = ()=> addOutcome("B");
+$("btnP").onclick = ()=> addOutcome("P");
+$("btnT").onclick = ()=> addOutcome("T");
+$("btnU").onclick = ()=> undo();
+$("btnR").onclick = ()=> resetAll();
+$("btnN").onclick = ()=> newShoe();
+
+// Card selects
+const cardOptions = buildCardOptions();
+initSelect("b1"); initSelect("b2"); initSelect("b3");
+initSelect("p1"); initSelect("p2"); initSelect("p3");
+
+["b1","b2","b3","p1","p2","p3"].forEach(id=>{
+  $(id).addEventListener("change", ()=>{
+    const v = $(id).value || null;
+    if(id[0]==="b") state.cards.b[Number(id[1])-1] = v;
+    if(id[0]==="p") state.cards.p[Number(id[1])-1] = v;
+    save();
+    renderCards();
   });
+});
 
-  const load = () => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (!raw) return defaultState();
-      const st = JSON.parse(raw);
-      if (!st || !Array.isArray(st.hands)) return defaultState();
-      // keep older data even if version changes
-      return { ...defaultState(), ...st };
-    } catch {
-      return defaultState();
-    }
-  };
+function initSelect(id){
+  const sel = $(id);
+  sel.innerHTML = "";
+  cardOptions.forEach(opt=>{
+    const o = document.createElement("option");
+    o.value = opt.value;
+    o.textContent = opt.label;
+    sel.appendChild(o);
+  });
+}
 
-  const save = () => localStorage.setItem(KEY, JSON.stringify(state));
+function buildCardOptions(){
+  const opts = [{value:"", label:"—"}];
+  const ranks = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+  // Suit không cần, chỉ rank đủ để tính điểm
+  ranks.forEach(r => opts.push({value:r, label:r}));
+  return opts;
+}
 
-  let state = load();
+function addOutcome(x){
+  state.seq.push(x);
+  save();
+  renderAll();
+}
 
-  // ===== DOM =====
-  const $ = (id) => document.getElementById(id);
+function undo(){
+  state.seq.pop();
+  save();
+  renderAll();
+}
 
-  const els = {
-    cntB: $("cntB"),
-    cntP: $("cntP"),
-    cntT: $("cntT"),
-    shoeNo: $("shoeNo"),
-    totalHands: $("totalHands"),
+function resetAll(){
+  if(!confirm("Reset toàn bộ dữ liệu (shoe + lịch sử)?")) return;
+  state.shoe = 1;
+  state.seq = [];
+  state.cards = { b:[null,null,null], p:[null,null,null] };
+  save();
+  renderAll();
+}
 
-    btnB: $("btnB"),
-    btnP: $("btnP"),
-    btnT: $("btnT"),
-    btnUndo: $("btnUndo"),
-    btnReset: $("btnReset"),
-    btnNewShoe: $("btnNewShoe"),
+function newShoe(){
+  state.shoe += 1;
+  state.seq = [];
+  // giữ cards như tuỳ chọn (nhưng mình cũng reset cho sạch)
+  state.cards = { b:[null,null,null], p:[null,null,null] };
+  save();
+  renderAll();
+}
 
-    b1: $("b1"), b2: $("b2"), b3: $("b3"),
-    p1: $("p1"), p2: $("p2"), p3: $("p3"),
-    bTotal: $("bTotal"), pTotal: $("pTotal"),
-    bPair: $("bPair"), pPair: $("pPair"),
-    bNat: $("bNat"), pNat: $("pNat"),
+function save(){
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return null;
+    return JSON.parse(raw);
+  }catch(e){ return null; }
+}
 
-    aiAction: $("aiAction"),
-    aiPhase: $("aiPhase"),
-    aiLean: $("aiLean"),
-    aiTrap: $("aiTrap"),
-    kConf: $("kConf"),
-    kNoise: $("kNoise"),
-    kEdge: $("kEdge"),
-    confTxt: $("confTxt"),
-    noiseTxt: $("noiseTxt"),
-    edgeTxt: $("edgeTxt"),
-    confBar: $("confBar"),
-    noiseBar: $("noiseBar"),
-    edgeBar: $("edgeBar"),
-    aiNote: $("aiNote"),
+function renderAll(){
+  renderStats();
+  renderHistory();
+  renderCards();
+  renderAI();
+}
+function renderStats(){
+  const b = state.seq.filter(x=>x==="B").length;
+  const p = state.seq.filter(x=>x==="P").length;
+  const t = state.seq.filter(x=>x==="T").length;
 
-    last12: $("last12"),
-    last30: $("last30"),
-    last50: $("last50"),
-    altRate: $("altRate"),
-    pairRate: $("pairRate"),
-    natRate: $("natRate"),
+  $("sB").textContent = b;
+  $("sP").textContent = p;
+  $("sT").textContent = t;
+  $("sShoe").textContent = state.shoe;
+  $("sTotal").textContent = state.seq.length;
+}
 
-    btnExport: $("btnExport"),
-    btnImport: $("btnImport"),
-    fileImport: $("fileImport"),
-
-    history: $("history"),
-    histLimit: $("histLimit"),
-  };
-
-  // ===== CARD VALUE MAP =====
-  // Baccarat point: A=1,2..9 as is, 10/J/Q/K = 0
-  const CARD_OPTS = [
-    { v: "",  label: "—" },
-    { v: "A", label: "A(1)" },
-    { v: "2", label: "2" },
-    { v: "3", label: "3" },
-    { v: "4", label: "4" },
-    { v: "5", label: "5" },
-    { v: "6", label: "6" },
-    { v: "7", label: "7" },
-    { v: "8", label: "8" },
-    { v: "9", label: "9" },
-    { v: "0", label: "10/J/Q/K(0)" },
-  ];
-
-  const pointOf = (c) => {
-    if (!c) return null;
-    if (c === "A") return 1;
-    if (c === "0") return 0;
-    const n = Number(c);
-    if (!Number.isFinite(n)) return null;
-    return n;
-  };
-
-  const sumPointsMod10 = (arr) => {
-    const pts = arr.map(pointOf).filter((x) => x !== null);
-    if (pts.length === 0) return 0;
-    const s = pts.reduce((a, b) => a + b, 0);
-    return s % 10;
-  };
-
-  const detectPair2 = (a, b) => (!!a && !!b && a === b);
-
-  const detectNatural = (twoCardsArr, third) => {
-    // "Long Bảo" = Natural 8 or 9 using first 2 cards and no 3rd card chosen
-    if (!twoCardsArr[0] || !twoCardsArr[1]) return false;
-    if (third) return false;
-    const t = sumPointsMod10(twoCardsArr.slice(0, 2));
-    return t === 8 || t === 9;
-  };
-
-  // ===== POPULATE SELECTS =====
-  const fillSelect = (sel) => {
-    sel.innerHTML = "";
-    for (const o of CARD_OPTS) {
-      const opt = document.createElement("option");
-      opt.value = o.v;
-      opt.textContent = o.label;
-      sel.appendChild(opt);
-    }
-  };
-
-  [els.b1, els.b2, els.b3, els.p1, els.p2, els.p3].forEach(fillSelect);
-
-  // ===== CURRENT INPUT (cards) =====
-  const getCardInput = () => {
-    const b = [els.b1.value, els.b2.value, els.b3.value].filter(x => x !== "");
-    const p = [els.p1.value, els.p2.value, els.p3.value].filter(x => x !== "");
-    const flags = {
-      bPair: detectPair2(els.b1.value, els.b2.value),
-      pPair: detectPair2(els.p1.value, els.p2.value),
-      bNat: detectNatural([els.b1.value, els.b2.value], els.b3.value),
-      pNat: detectNatural([els.p1.value, els.p2.value], els.p3.value),
+function renderHistory(){
+  const h = $("history");
+  h.innerHTML = "";
+  state.seq.slice().reverse().forEach((x, idxRev)=>{
+    const idx = state.seq.length - 1 - idxRev;
+    const div = document.createElement("div");
+    div.className = "hItem " + (x==="B" ? "hB" : x==="P" ? "hP" : "hT");
+    div.textContent = `${x} • #${idx+1}`;
+    div.title = "Chạm để xoá ván này";
+    div.onclick = ()=>{
+      state.seq.splice(idx,1);
+      save();
+      renderAll();
     };
-    return { b, p, flags };
-  };
-
-  const updateCardPreview = () => {
-    const { b, p, flags } = getCardInput();
-    els.bTotal.textContent = String(sumPointsMod10(b));
-    els.pTotal.textContent = String(sumPointsMod10(p));
-    els.bPair.textContent = flags.bPair ? "YES" : "NO";
-    els.pPair.textContent = flags.pPair ? "YES" : "NO";
-    els.bNat.textContent  = flags.bNat ? "YES (8/9)" : "NO";
-    els.pNat.textContent  = flags.pNat ? "YES (8/9)" : "NO";
-  };
-
-  [els.b1, els.b2, els.b3, els.p1, els.p2, els.p3].forEach(s => {
-    s.addEventListener("change", updateCardPreview);
+    h.appendChild(div);
   });
+}
 
-  // ===== ADD HAND =====
-  const addHand = (res) => {
-    const now = Date.now();
-    const ci = getCardInput();
-    state.hands.push({
-      t: now,
-      res,
-      cards: { b: ci.b, p: ci.p },
-      flags: ci.flags,
-      shoe: state.shoe,
-    });
-    save();
-    render();
-  };
+function renderCards(){
+  // set selects current value
+  ["b1","b2","b3"].forEach((id,i)=> $(id).value = state.cards.b[i] || "");
+  ["p1","p2","p3"].forEach((id,i)=> $(id).value = state.cards.p[i] || "");
 
-  const undo = () => {
-    state.hands.pop();
-    save();
-    render();
-  };
+  const bRes = evalHand(state.cards.b);
+  const pRes = evalHand(state.cards.p);
 
-  const resetAll = () => {
-    if (!confirm("RESET sẽ xoá toàn bộ lịch sử. Chắc chắn?")) return;
-    state = defaultState();
-    save();
-    render();
-  };
+  $("bInfo").textContent = `Tổng: ${bRes.total} • Pair(2 lá): ${bRes.pair2 ? "YES" : "NO"} • Long Bảo: ${bRes.natural ? "YES" : "NO"}`;
+  $("pInfo").textContent = `Tổng: ${pRes.total} • Pair(2 lá): ${pRes.pair2 ? "YES" : "NO"} • Long Bảo: ${pRes.natural ? "YES" : "NO"}`;
+}
 
-  const newShoe = () => {
-    state.shoe += 1;
-    save();
-    render();
-  };
+// Baccarat values: A=1, 2-9 as is, 10/J/Q/K = 0
+function rankValue(r){
+  if(!r) return 0;
+  if(r==="A") return 1;
+  if(["10","J","Q","K"].includes(r)) return 0;
+  const n = Number(r);
+  return Number.isFinite(n) ? n : 0;
+}
 
-  // ===== STATS HELPERS =====
-  const lastN = (arr, n) => arr.slice(Math.max(0, arr.length - n));
+function evalHand(arr){
+  const r1 = arr[0], r2 = arr[1], r3 = arr[2];
+  const v1 = rankValue(r1), v2 = rankValue(r2), v3 = rankValue(r3);
+  const two = (v1 + v2) % 10;
+  const total = (two + v3) % 10;
+  const pair2 = (!!r1 && !!r2 && r1 === r2);
+  const natural = (!!r1 && !!r2 && (two === 8 || two === 9)); // Natural 8/9 (Long Bảo)
+  return { total, pair2, natural };
+}
 
-  const stripBP = (hands) => hands
-    .map(h => h.res)
-    .filter(r => r === "B" || r === "P"); // ignore ties for BP analysis
+/* =========================
+   AI GOD CORE
+   =========================
+   Ý tưởng:
+   - Không dự đoán "ván tới", mà đọc bàn: Trend/Chop/Noise/Phase
+   - Decision: PLAY (lean B/P), WAIT, SKIP (bàn bẫy)
+*/
 
-  const count = (hands) => {
-    let B=0,P=0,T=0;
-    for (const h of hands) {
-      if (h.res==="B") B++;
-      else if (h.res==="P") P++;
-      else T++;
-    }
-    return {B,P,T,total:hands.length};
-  };
+function renderAI(){
+  const seqBP = state.seq.filter(x=>x==="B"||x==="P");
+  const n = seqBP.length;
 
-  const altRateBP = (seqBP) => {
-    if (seqBP.length < 2) return 0;
-    let alt = 0;
-    for (let i=1;i<seqBP.length;i++) if (seqBP[i] !== seqBP[i-1]) alt++;
-    return alt / (seqBP.length - 1);
-  };
+  // windows
+  const w12 = lastWindow(seqBP, 12);
+  const w30 = lastWindow(seqBP, 30);
+  const w50 = lastWindow(seqBP, 50);
 
-  const longestStreakBP = (seqBP) => {
-    let best=0, cur=0, curSide=null;
-    for (const x of seqBP) {
-      if (x === curSide) cur++;
-      else { curSide = x; cur = 1; }
-      if (cur > best) best = cur;
-    }
-    return best;
-  };
+  const s12 = summarize(w12);
+  const s30 = summarize(w30);
+  const s50 = summarize(w50);
 
-  // Binary entropy for p(B)
-  const entropy01 = (p) => {
-    if (p <= 0 || p >= 1) return 0;
-    return -(p*Math.log2(p) + (1-p)*Math.log2(1-p)); // 0..1
-  };
+  $("bLast12").textContent = fmtBP(s12);
+  $("bLast30").textContent = fmtBP(s30);
+  $("bLast50").textContent = fmtBP(s50);
 
-  // Wilson interval width -> confidence proxy
-  const wilsonCenter = (k, n, z=1.0) => {
-    // returns center estimate for p
-    if (n === 0) return 0.5;
-    const phat = k/n;
-    const denom = 1 + (z*z)/n;
-    const center = (phat + (z*z)/(2*n)) / denom;
-    return center;
-  };
+  const chop = alternationRate(w30);      // 0..1
+  const streak = longestStreak(w30);      // integer
+  const curStreak = currentStreak(w30);   // integer & side
+  $("bChop").textContent = `Alt: ${(chop*100).toFixed(0)}% • Longest: ${streak.len}${streak.side} • Now: ${curStreak.len}${curStreak.side}`;
 
-  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  // entropy & noise proxy
+  const ent = entropyBinary(s30.b, s30.p);          // 0..1 (max near 0.5 split)
+  const noise = clamp01(0.55*chop + 0.35*ent + 0.10*volatility(w30)); // 0..1
 
-  // ===== "AI" (OBSERVATION ENGINE) =====
-  const analyze = () => {
-    const hands = state.hands;
-    const bpAll = stripBP(hands);
+  // lean & edge proxy (not real EV, just "signal strength")
+  const leanScore = weightedLeanScore(s12, s30, s50, curStreak, chop);
+  const lean = leanScore > 0 ? "B" : leanScore < 0 ? "P" : "NONE";
+  const signal = Math.abs(leanScore); // 0..1
+  const edgeProxy = clamp01(signal*(1-noise)); // 0..1
 
-    const w12 = stripBP(lastN(hands, 12));
-    const w30 = stripBP(lastN(hands, 30));
-    const w50 = stripBP(lastN(hands, 50));
+  // phase classify
+  const phase = classifyPhase(n, noise, curStreak, chop);
 
-    const cntAll = count(hands);
-    const cntBP30 = { B: w30.filter(x=>x==="B").length, P: w30.filter(x=>x==="P").length, n: w30.length };
-    const cntBP12 = { B: w12.filter(x=>x==="B").length, P: w12.filter(x=>x==="P").length, n: w12.length };
+  // confidence
+  // - tăng khi signal mạnh, noise thấp, streak rõ
+  const conf = clamp01( 0.15 + 0.60*edgeProxy + 0.20*clamp01((curStreak.len-1)/5) - 0.10*clamp01((chop-0.65)/0.35) );
 
-    const pB30 = cntBP30.n ? cntBP30.B / cntBP30.n : 0.5;
-    const pB12 = cntBP12.n ? cntBP12.B / cntBP12.n : 0.5;
+  // decision rules
+  let decision = "WAIT";
+  let reason = "dữ liệu/nhịp chưa rõ";
 
-    const e30 = entropy01(pB30); // 0..1
-    const alt30 = altRateBP(w30); // 0..1
-
-    // Noise: blend of entropy + high alternation (đảo) + low sample penalty
-    const samplePenalty = cntBP30.n < 12 ? 0.25 : 0;
-    const noise = clamp( (e30*0.55 + alt30*0.45) + samplePenalty, 0, 1 );
-
-    // Confidence: more sample + clearer lean + lower noise
-    const leanMag = Math.abs(pB30 - 0.5) * 2; // 0..1
-    const nFactor = clamp(cntBP30.n / 50, 0, 1); // 0..1
-    const conf = clamp( (nFactor*0.45 + leanMag*0.45 + (1-noise)*0.10), 0, 1 );
-
-    // Edge (obs): deviation scaled by sqrt(n), capped
-    const edgeRaw = (pB30 - 0.5) * 2; // -1..1
-    const edge = clamp(edgeRaw * Math.sqrt(Math.max(1, cntBP30.n))/3, -1, 1); // -1..1
-
-    // Trap detection: high noise or high alternation & low lean
-    let trap = "—";
-    if (cntBP30.n < 12) trap = "DATA LOW";
-    else if (noise > 0.72) trap = "NOISE HIGH";
-    else if (alt30 > 0.68 && leanMag < 0.18) trap = "ĐẢO NHIỀU";
-    else if (longestStreakBP(w30) >= 6 && alt30 < 0.35) trap = "DỄ ĐU DÂY";
-    else trap = "OK";
-
-    // Phase (simple)
-    let phase = "CÂN";
-    if (cntBP30.n < 12) phase = "DỮ LIỆU ÍT";
-    else if (noise > 0.72) phase = "NHIỄU";
-    else if (leanMag < 0.12) phase = "CÂN";
-    else phase = "LỆCH";
-
-    // Lean
-    let lean = "NONE";
-    if (cntBP30.n >= 12) {
-      if (pB30 > 0.55) lean = "BANKER";
-      else if (pB30 < 0.45) lean = "PLAYER";
-      else lean = "NONE";
-    }
-
-    // Action: WAIT / OBSERVE / SKIP (no betting instruction)
-    let action = "WAIT";
-    let note = "Chưa đủ dữ liệu. Nhập thêm ván để AI phân tích nhịp.";
-    if (cntBP30.n >= 12) {
-      if (trap !== "OK") {
-        action = "SKIP";
-        note = `Cảnh báo: ${trap}. Nên quan sát thêm, tránh quyết định vội.`;
-      } else if (conf >= 0.62 && lean !== "NONE" && noise <= 0.60) {
-        action = "OBSERVE";
-        note = `Nhịp tương đối rõ (Last30). Lean nghiêng về ${lean}. Đây là thống kê quan sát, không đảm bảo kết quả.`;
+  if(n < 8){
+    decision = "WAIT";
+    reason = "dữ liệu ít (<8 ván B/P)";
+  } else {
+    // SKIP: noise quá cao hoặc chop cực cao, dễ bẫy
+    if(noise > 0.62 || chop > 0.78){
+      decision = "SKIP";
+      reason = "nhiễu cao / chop gắt → dễ bẫy";
+    } else {
+      // PLAY: cần conf >= 0.62 và edgeProxy đủ
+      if(conf >= 0.62 && edgeProxy >= 0.22){
+        decision = (lean==="B" ? "PLAY BANKER" : lean==="P" ? "PLAY PLAYER" : "WAIT");
+        reason = lean==="NONE" ? "nhịp có nhưng chưa nghiêng cửa" : "nhịp rõ + nhiễu thấp";
       } else {
-        action = "WAIT";
-        note = `Nhịp chưa đủ rõ hoặc còn nhiễu. Ưu tiên chờ thêm dữ liệu.`;
+        // WAIT when borderline
+        decision = "WAIT";
+        reason = "chưa đủ ngưỡng (conf/edge)";
       }
     }
-
-    return {
-      cntAll,
-      w12, w30, w50,
-      pB12, pB30,
-      alt30,
-      noise, conf, edge,
-      phase, lean, trap, action, note
-    };
-  };
-
-  // ===== PAIR / NAT RATE =====
-  const calcPairNatRates = (hands) => {
-    if (hands.length === 0) return { pair:0, nat:0 };
-    let pairCount=0, natCount=0;
-    for (const h of hands) {
-      if (h.flags?.bPair) pairCount++;
-      if (h.flags?.pPair) pairCount++;
-      if (h.flags?.bNat) natCount++;
-      if (h.flags?.pNat) natCount++;
-    }
-    // each hand can contribute up to 2 sides
-    const denom = hands.length * 2;
-    return { pair: pairCount/denom, nat: natCount/denom };
-  };
-
-  // ===== RENDER =====
-  const fmtPct = (x) => `${Math.round(x*100)}%`;
-
-  const renderHistory = () => {
-    const limit = Number(els.histLimit.value || 200);
-    const hands = lastN(state.hands, limit);
-    els.history.innerHTML = "";
-
-    for (let i = hands.length - 1; i >= 0; i--) {
-      const h = hands[i];
-      const node = document.createElement("div");
-      node.className = "item";
-
-      const tag = document.createElement("span");
-      tag.className = "tag " + (h.res==="B" ? "tagB" : h.res==="P" ? "tagP" : "tagT");
-      tag.textContent = h.res;
-
-      const meta = document.createElement("span");
-      meta.className = "meta";
-      const d = new Date(h.t);
-      const hh = String(d.getHours()).padStart(2,"0");
-      const mm = String(d.getMinutes()).padStart(2,"0");
-
-      const f = h.flags || {};
-      const extras = [];
-      if (f.bPair) extras.push("B-Pair");
-      if (f.pPair) extras.push("P-Pair");
-      if (f.bNat) extras.push("B-Nat");
-      if (f.pNat) extras.push("P-Nat");
-      meta.textContent = `${hh}:${mm} • Shoe ${h.shoe}` + (extras.length ? ` • ${extras.join(",")}` : "");
-
-      node.appendChild(tag);
-      node.appendChild(meta);
-
-      // tap to delete exact this entry
-      node.addEventListener("click", () => {
-        const globalIndex = state.hands.length - (hands.length - i);
-        if (globalIndex >= 0 && globalIndex < state.hands.length) {
-          if (!confirm("Xoá ván này?")) return;
-          state.hands.splice(globalIndex, 1);
-          save();
-          render();
-        }
-      });
-
-      els.history.appendChild(node);
-    }
-  };
-
-  const render = () => {
-    // counts
-    const c = count(state.hands);
-    els.cntB.textContent = c.B;
-    els.cntP.textContent = c.P;
-    els.cntT.textContent = c.T;
-    els.totalHands.textContent = c.total;
-    els.shoeNo.textContent = state.shoe;
-
-    // analysis
-    const a = analyze();
-
-    // lastN strings
-    const showBP = (seq) => {
-      const B = seq.filter(x=>x==="B").length;
-      const P = seq.filter(x=>x==="P").length;
-      return seq.length ? `B:${B} • P:${P} • n:${seq.length}` : "—";
-    };
-    els.last12.textContent = showBP(a.w12);
-    els.last30.textContent = showBP(a.w30);
-    els.last50.textContent = showBP(a.w50);
-
-    // alt
-    els.altRate.textContent = a.w30.length ? fmtPct(a.alt30) : "—";
-
-    // pair/nat
-    const pn = calcPairNatRates(state.hands);
-    els.pairRate.textContent = c.total ? fmtPct(pn.pair) : "—";
-    els.natRate.textContent  = c.total ? fmtPct(pn.nat) : "—";
-
-    // AI
-    els.aiAction.textContent = a.action;
-    els.aiPhase.textContent  = a.phase;
-    els.aiLean.textContent   = a.lean;
-    els.aiTrap.textContent   = a.trap;
-
-    const confPct = clamp(a.conf,0,1);
-    const noisePct = clamp(a.noise,0,1);
-    const edgePct = (a.edge); // -1..1
-
-    els.kConf.textContent = fmtPct(confPct);
-    els.kNoise.textContent = fmtPct(noisePct);
-    els.kEdge.textContent = `${Math.round(edgePct*100)}%`;
-
-    els.confTxt.textContent = fmtPct(confPct);
-    els.noiseTxt.textContent = fmtPct(noisePct);
-    els.edgeTxt.textContent = `${Math.round(edgePct*100)}%`;
-
-    els.confBar.style.width = `${Math.round(confPct*100)}%`;
-    els.noiseBar.style.width = `${Math.round(noisePct*100)}%`;
-    els.edgeBar.style.width = `${Math.round((edgePct+1)*50)}%`; // center at 50%
-
-    els.aiNote.textContent = a.note;
-
-    updateCardPreview();
-    renderHistory();
-  };
-
-  // ===== EXPORT / IMPORT =====
-  const exportJSON = () => {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `hao-baccarat-ultra-v3_${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  const importJSON = (file) => {
-    const fr = new FileReader();
-    fr.onload = () => {
-      try {
-        const obj = JSON.parse(String(fr.result || "{}"));
-        if (!obj || !Array.isArray(obj.hands)) throw new Error("Invalid file");
-        state = { ...defaultState(), ...obj };
-        save();
-        render();
-        alert("IMPORT OK");
-      } catch (e) {
-        alert("File không đúng định dạng.");
-      }
-    };
-    fr.readAsText(file);
-  };
-
-  // ===== EVENTS =====
-  els.btnB.addEventListener("click", () => addHand("B"));
-  els.btnP.addEventListener("click", () => addHand("P"));
-  els.btnT.addEventListener("click", () => addHand("T"));
-  els.btnUndo.addEventListener("click", undo);
-  els.btnReset.addEventListener("click", resetAll);
-  els.btnNewShoe.addEventListener("click", newShoe);
-
-  els.btnExport.addEventListener("click", exportJSON);
-  els.btnImport.addEventListener("click", () => els.fileImport.click());
-  els.fileImport.addEventListener("change", (e) => {
-    const f = e.target.files?.[0];
-    if (f) importJSON(f);
-    els.fileImport.value = "";
-  });
-
-  els.histLimit.addEventListener("change", renderHistory);
-
-  // ===== PWA / SW =====
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js").catch(()=>{});
-    });
   }
 
-  // initial
-  render();
-})();
+  // Update UI
+  $("aiDecision").textContent = decision;
+  $("aiPhase").textContent = `PHASE: ${phase}`;
+  $("aiLean").textContent = `LEAN: ${lean}`;
+  $("aiReason").textContent = `REASON: ${reason}`;
+
+  setKpi("kConf","barConf", conf);
+  setKpi("kNoise","barNoise", noise);
+  setKpi("kEdge","barEdge", edgeProxy);
+
+  // Color the big decision subtly
+  const el = $("aiDecision");
+  el.style.borderColor = "#e5e7eb";
+  el.style.background = "#ffffff";
+  if(decision.includes("BANKER")){
+    el.style.borderColor = "rgba(22,163,74,.35)";
+    el.style.background = "rgba(22,163,74,.06)";
+  } else if(decision.includes("PLAYER")){
+    el.style.borderColor = "rgba(37,99,235,.35)";
+    el.style.background = "rgba(37,99,235,.06)";
+  } else if(decision==="SKIP"){
+    el.style.borderColor = "rgba(239,68,68,.35)";
+    el.style.background = "rgba(239,68,68,.06)";
+  } else {
+    el.style.borderColor = "rgba(245,158,11,.35)";
+    el.style.background = "rgba(245,158,11,.05)";
+  }
+}
+
+function setKpi(numId, barId, x01){
+  const pct = Math.round(clamp01(x01)*100);
+  $(numId).textContent = pct;
+  $(barId).style.width = pct + "%";
+  // keep neutral (no custom colors), but still readable by default
+}
+
+function lastWindow(arr, k){
+  return arr.slice(Math.max(0, arr.length-k));
+}
+function summarize(arr){
+  const b = arr.filter(x=>x==="B").length;
+  const p = arr.filter(x=>x==="P").length;
+  return { b, p, n: arr.length };
+}
+function fmtBP(s){
+  if(s.n===0) return "—";
+  const bb = Math.round((s.b/s.n)*100);
+  const pp = Math.round((s.p/s.n)*100);
+  return `B ${s.b} (${bb}%) • P ${s.p} (${pp}%)`;
+}
+
+function alternationRate(arr){
+  if(arr.length<2) return 0;
+  let alt=0, m=0;
+  for(let i=1;i<arr.length;i++){
+    if(arr[i]!==arr[i-1]) alt++;
+    m++;
+  }
+  return m? alt/m : 0;
+}
+
+function longestStreak(arr){
+  let bestLen=0, bestSide="—";
+  let curLen=0, curSide=null;
+  for(const x of arr){
+    if(x===curSide){ curLen++; }
+    else { curSide=x; curLen=1; }
+    if(curLen>bestLen){ bestLen=curLen; bestSide=curSide; }
+  }
+  return {len: bestLen, side: bestSide||"—"};
+}
+function currentStreak(arr){
+  if(arr.length===0) return {len:0, side:"—"};
+  let side = arr[arr.length-1];
+  let len=1;
+  for(let i=arr.length-2;i>=0;i--){
+    if(arr[i]===side) len++;
+    else break;
+  }
+  return {len, side};
+}
+
+// Entropy for binary split: 0..1 (0 when all same; 1 near 50/50)
+function entropyBinary(b,p){
+  const n = b+p;
+  if(n===0) return 0;
+  const pb=b/n, pp=p/n;
+  const h = (pb>0?-pb*Math.log2(pb):0) + (pp>0?-pp*Math.log2(pp):0);
+  // max entropy for 2 outcomes = 1
+  return clamp01(h/1);
+}
+
+// volatility proxy: how often 2-step pattern changes
+function volatility(arr){
+  if(arr.length<4) return 0;
+  let changes=0, base=0;
+  for(let i=3;i<arr.length;i++){
+    const a = arr[i-3]+arr[i-2];
+    const b = arr[i-1]+arr[i];
+    if(a!==b) changes++;
+    base++;
+  }
+  return base? changes/base : 0;
+}
+
+// Weighted lean score: +B, -P (0..1)
+function weightedLeanScore(s12,s30,s50,curStreak,chop){
+  // smooth proportions with pseudo counts to avoid overreact
+  const p12 = smoothProp(s12.b, s12.p, 2); // 0..1
+  const p30 = smoothProp(s30.b, s30.p, 2);
+  const p50 = smoothProp(s50.b, s50.p, 2);
+
+  // baseline signal: weighted by recency
+  const base = 0.55*(p12-0.5) + 0.30*(p30-0.5) + 0.15*(p50-0.5);
+
+  // streak boost (if streak >=3 and chop not too high)
+  let boost = 0;
+  if(curStreak.len>=3 && chop < 0.65){
+    boost = 0.08 * Math.min(4, curStreak.len-2) * (curStreak.side==="B" ? 1 : -1);
+  }
+
+  // chop penalty (too choppy reduces lean)
+  const penalty = 0.10 * clamp01((chop-0.55)/0.35) * Math.sign(base || 1);
+
+  const score = base + boost - penalty;
+  // squash to -1..1
+  return clamp(score, -0.9, 0.9);
+}
+
+function smoothProp(b,p,alpha){
+  const n=b+p;
+  if(n===0) return 0.5;
+  // add alpha to both sides
+  return (b+alpha)/(n+2*alpha);
+}
+
+function classifyPhase(n, noise, curStreak, chop){
+  if(n < 8) return "DỮ LIỆU ÍT";
+  if(noise > 0.62 || chop > 0.78) return "TRAP / BREAKDOWN";
+  if(curStreak.len >= 4 && noise < 0.52 && chop < 0.62) return "TREND / FLOW";
+  if(curStreak.len >= 2 && noise < 0.60) return "FORMATION";
+  return "RANDOM / NHIỄU";
+}
+
+function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+
+// Initial render
+renderAll();
