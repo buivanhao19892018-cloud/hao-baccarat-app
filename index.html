@@ -6,7 +6,7 @@
   <title>Bùi Hào — Baccarat • ULTRA AI V3 • WHITE PRO</title>
   <meta name="theme-color" content="#ffffff" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=3.0.0" />
+  <link rel="stylesheet" href="styles.css?v=3.1.0" />
 </head>
 <body>
   <header class="topbar">
@@ -93,6 +93,32 @@
 
     <section class="panel">
       <div class="panelHead">
+        <div class="panelTitle">LIVE STATUS (CỘNG BÀI + ROADMAP)</div>
+        <div class="panelNote">Live = điểm ván + lực (Δ) + proxy hình cầu. Không khuyến nghị cược.</div>
+      </div>
+
+      <div class="grid2">
+        <div class="box">
+          <div class="boxTitle">Ván vừa ra (Points)</div>
+          <div class="boxText" id="liveLast">—</div>
+        </div>
+        <div class="box">
+          <div class="boxTitle">Lực ván (Δ)</div>
+          <div class="boxText" id="liveDelta">—</div>
+        </div>
+        <div class="box">
+          <div class="boxTitle">Nhịp (Strength/Noise)</div>
+          <div class="boxText" id="liveMode">—</div>
+        </div>
+        <div class="box">
+          <div class="boxTitle">Roadmap proxy</div>
+          <div class="boxText" id="liveRoad">—</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panelHead">
         <div class="panelTitle">Nhập lá bài (tuỳ chọn) • Pair + Long Bảo</div>
         <div class="panelNote">Chọn 2–3 lá. 10/J/Q/K = 0. App tự nhận Pair(2 lá đầu) & Natural 8/9.</div>
       </div>
@@ -105,7 +131,7 @@
             <select id="b2" class="sel"></select>
             <select id="b3" class="sel"></select>
           </div>
-          <div class="sideFoot" id="bInfo">Tổng: 0 • Pair(2 lá): NO • Long Bảo: NO</div>
+          <div class="sideFoot" id="bInfo">Tổng: — • Pair(2 lá): NO • Long Bảo: NO</div>
         </div>
 
         <div class="cardSide">
@@ -115,15 +141,19 @@
             <select id="p2" class="sel"></select>
             <select id="p3" class="sel"></select>
           </div>
-          <div class="sideFoot" id="pInfo">Tổng: 0 • Pair(2 lá): NO • Long Bảo: NO</div>
+          <div class="sideFoot" id="pInfo">Tổng: — • Pair(2 lá): NO • Long Bảo: NO</div>
         </div>
+      </div>
+
+      <div class="miniNote">
+        Tip: nhập lá bài xong rồi bấm Banker/Player/Tie để lưu ván kèm meta (điểm/Δ/Pair/Natural).
       </div>
     </section>
 
     <section class="panel">
       <div class="panelHead">
         <div class="panelTitle">Lịch sử (tap để xoá 1 ván)</div>
-        <div class="panelNote">Lưu localStorage. Export/Import sẽ làm ở V4 (nếu bạn muốn).</div>
+        <div class="panelNote">Lưu localStorage. (Export/Import sẽ làm ở V4 nếu Hào muốn)</div>
       </div>
       <div id="history" class="history"></div>
     </section>
@@ -131,15 +161,14 @@
 
   <footer class="foot">
     <div>Tip: Khi GitHub Pages “ra bản cũ” → hard refresh + xoá cache/Service Worker.</div>
-    <div class="small">ULTRA AI V3 — build: <span id="build">3.0.0</span></div>
+    <div class="small">ULTRA AI V3 — build: <span id="build">3.1.0</span></div>
   </footer>
 
-  <script src="app.js?v=3.0.0"></script>
+  <script src="app.js?v=3.1.0"></script>
   <script>
-    // Register SW (cache ổn + tự update khi đổi phiên bản)
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=3.0.0').catch(()=>{});
+        navigator.serviceWorker.register('./sw.js?v=3.1.0').catch(()=>{});
       });
     }
   </script>
